@@ -37,6 +37,22 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   AgentNotifier(this._agentService) : super(AgentState());
 
+  Future<void> loadAgentByUserId(String userId) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      final agent = await _agentService.getAgentByUserId(userId);
+      state = state.copyWith(
+        isLoading: false,
+        agents: [agent], // Store the current agent in the agents list
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+    }
+  }
+
   Future<void> loadAvailableAgents() async {
     try {
       state = state.copyWith(isLoading: true, error: null);

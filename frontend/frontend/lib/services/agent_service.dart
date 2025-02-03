@@ -9,6 +9,15 @@ class AgentService {
 
   AgentService(this._apiService);
 
+  Future<Agent> getAgentByUserId(String userId) async {
+    try {
+      final response = await _apiService.get('/agents/user/$userId');
+      return Agent.fromJson(response.data['data']);
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Future<List<Agent>> getAvailableAgents() async {
     try {
       final response = await _apiService.get('/agents/available');
