@@ -1,12 +1,13 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'notification.dart';
+part of 'notification_item.dart';
 
 // **************************************************************************
 // JsonSerializableGenerator
 // **************************************************************************
 
-Notification _$NotificationFromJson(Map<String, dynamic> json) => Notification(
+NotificationItem _$NotificationItemFromJson(Map<String, dynamic> json) =>
+    NotificationItem(
       id: json['id'] as String,
       type: json['type'] as String,
       message: json['message'] as String,
@@ -17,7 +18,7 @@ Notification _$NotificationFromJson(Map<String, dynamic> json) => Notification(
       metadata: json['metadata'] as Map<String, dynamic>?,
     );
 
-Map<String, dynamic> _$NotificationToJson(Notification instance) =>
+Map<String, dynamic> _$NotificationItemToJson(NotificationItem instance) =>
     <String, dynamic>{
       'id': instance.id,
       'type': instance.type,

@@ -1,14 +1,15 @@
 import 'package:smart_ticketing/config/api_config.dart';
+import 'package:smart_ticketing/services/notification_item.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import '../models/notification.dart';
+import '../models/notification_item.dart';
 import 'api_service.dart';
 
 class NotificationService {
   final ApiService _apiService;
   late IO.Socket _socket;
   final FlutterLocalNotificationsPlugin _localNotifications;
-  final Function(Notification) onNewNotification;
+  final Function(NotificationItem) onNewNotification;
 
   NotificationService(
     this._apiService,
@@ -57,7 +58,7 @@ class NotificationService {
     });
 
     _socket.on('notification', (data) {
-      final notification = Notification.fromJson(data);
+      final notification = NotificationItem.fromJson(data);
       _handleNewNotification(notification);
     });
 
@@ -70,7 +71,7 @@ class NotificationService {
     });
   }
 
-  void _handleNewNotification(Notification notification) {
+  void _handleNewNotification(NotificationItem notification) {
     // Show local notification
     _showLocalNotification(notification);
 
@@ -78,7 +79,7 @@ class NotificationService {
     onNewNotification(notification);
   }
 
-  Future<void> _showLocalNotification(Notification notification) async {
+  Future<void> _showLocalNotification(NotificationItem notification) async {
     const androidDetails = AndroidNotificationDetails(
       'ticketing_system',
       'Ticketing System',
@@ -107,30 +108,30 @@ class NotificationService {
     );
   }
 
-  String _getNotificationTitle(Notification notification) {
+  String _getNotificationTitle(NotificationItem notification) {
     switch (notification.notificationType) {
-      case NotificationType.ticketAssigned:
+      case NotificationItemType.ticketAssigned:
         return 'New Ticket Assigned';
-      case NotificationType.slaBreached:
+      case NotificationItemType.slaBreached:
         return 'SLA Breach Alert';
-      case NotificationType.escalation:
+      case NotificationItemType.escalation:
         return 'Ticket Escalated';
-      case NotificationType.shiftEnding:
+      case NotificationItemType.shiftEnding:
         return 'Shift Ending Soon';
-      case NotificationType.handover:
+      case NotificationItemType.handover:
         return 'Ticket Handover';
-      case NotificationType.breakReminder:
+      case NotificationItemType.breakReminder:
         return 'Break Time';
-      default:
+      case NotificationItemType.other:
         return 'New Notification';
     }
   }
 
-  Future<List<Notification>> getUnreadNotifications() async {
+  Future<List<NotificationItem>> getUnreadNotifications() async {
     try {
       final response = await _apiService.get('/notifications/unread');
       return (response.data['data'] as List)
-          .map((json) => Notification.fromJson(json))
+          .map((json) => NotificationItem.fromJson(json))
           .toList();
     } catch (e) {
       print('Error fetching unread notifications: $e');

@@ -10,11 +10,11 @@ import '../services/auth_service.dart';
 
 enum AuthStatus { initial, authenticated, unauthenticated, error }
 
-class AuthState extends ChangeNotifier {
-  bool isLoading;
-  AuthStatus status;
-  User? user;
-  String? error;
+class AuthState {
+  final bool isLoading;
+  final AuthStatus status;
+  final User? user;
+  final String? error;
 
   AuthState({
     this.isLoading = false,
@@ -38,19 +38,6 @@ class AuthState extends ChangeNotifier {
   }
 
   bool get isAuthenticated => status == AuthStatus.authenticated;
-
-  void update({
-    bool? isLoading,
-    AuthStatus? status,
-    User? user,
-    String? error,
-  }) {
-    this.isLoading = isLoading ?? this.isLoading;
-    this.status = status ?? this.status;
-    this.user = user ?? this.user;
-    this.error = error;
-    notifyListeners();
-  }
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
@@ -64,14 +51,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> checkAuthStatus() async {
     try {
-      state.update(isLoading: true);
+      state = state.copyWith(isLoading: true);
       final token = await _storage.read(key: 'token');
       final refreshToken = await _storage.read(key: 'refreshToken');
 
       if (token != null) {
         final response = await _authService.validateSession(token);
         if (response['isValid']) {
-          state.update(
+          state = state.copyWith(
             isLoading: false,
             status: AuthStatus.authenticated,
             user: response['user'] as User, // User object includes token
@@ -123,11 +110,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> login(String email, String password) async {
     try {
-      state.update(isLoading: true, error: null);
+      state = state.copyWith(isLoading: true, error: null);
 
       final response = await _authService.login(email, password);
 
-      state.update(
+      state = state.copyWith(
         isLoading: false,
         status: AuthStatus.authenticated,
         user: response.user, // User object already includes token
@@ -135,7 +122,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       _setupTokenRefresh();
     } catch (e) {
-      state.update(
+      state = state.copyWith(
         isLoading: false,
         status: AuthStatus.error,
         error: e.toString(),
@@ -151,7 +138,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Update the user object with the new token
       final updatedUser = state.user?.copyWith(token: response['token']);
 
-      state.update(
+      state = state.copyWith(
         user: updatedUser,
         status: AuthStatus.authenticated,
         isLoading: false,
@@ -183,12 +170,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     _refreshTimer?.cancel();
     await _authService.logout();
-    state.update(
+    state = state.copyWith(
       isLoading: false,
       status: AuthStatus.unauthenticated,
       user: null,
     );
   }
+
+  changePassword(
+      {required String currentPassword, required String newPassword}) {}
+
+  updateProfile({required String name, required String email}) {}
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {

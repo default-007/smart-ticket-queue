@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:smart_ticketing/models/notification.dart' as smartTicketing;
-import 'package:smart_ticketing/models/notification.dart';
+import 'package:smart_ticketing/models/notification_item.dart';
+import 'package:smart_ticketing/services/notification_item.dart';
 import 'package:timeago/timeago.dart' as timeago;
 //import '../../models/notification.dart';
 import '../../providers/notification_provider.dart';
 
 class NotificationTile extends ConsumerWidget {
-  final smartTicketing.Notification notification;
+  final NotificationItem notification;
 
   const NotificationTile({
     Key? key,
@@ -90,17 +90,17 @@ class NotificationTile extends ConsumerWidget {
 
   IconData _getNotificationIcon() {
     switch (notification.notificationType) {
-      case smartTicketing.NotificationType.ticketAssigned:
+      case NotificationItemType.ticketAssigned:
         return Icons.assignment;
-      case smartTicketing.NotificationType.slaBreached:
+      case NotificationItemType.slaBreached:
         return Icons.warning;
-      case NotificationType.escalation:
+      case NotificationItemType.escalation:
         return Icons.arrow_upward;
-      case NotificationType.shiftEnding:
+      case NotificationItemType.shiftEnding:
         return Icons.access_time;
-      case NotificationType.handover:
+      case NotificationItemType.handover:
         return Icons.swap_horiz;
-      case NotificationType.breakReminder:
+      case NotificationItemType.breakReminder:
         return Icons.coffee;
       default:
         return Icons.notifications;
@@ -109,17 +109,17 @@ class NotificationTile extends ConsumerWidget {
 
   String _getNotificationTitle() {
     switch (notification.notificationType) {
-      case NotificationType.ticketAssigned:
+      case NotificationItemType.ticketAssigned:
         return 'New Ticket Assignment';
-      case NotificationType.slaBreached:
+      case NotificationItemType.slaBreached:
         return 'SLA Breach Alert';
-      case NotificationType.escalation:
+      case NotificationItemType.escalation:
         return 'Ticket Escalation';
-      case NotificationType.shiftEnding:
+      case NotificationItemType.shiftEnding:
         return 'Shift Ending Soon';
-      case NotificationType.handover:
+      case NotificationItemType.handover:
         return 'Ticket Handover';
-      case NotificationType.breakReminder:
+      case NotificationItemType.breakReminder:
         return 'Break Reminder';
       default:
         return 'Notification';

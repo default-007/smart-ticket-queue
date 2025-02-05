@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../models/notification.dart';
+import '../../models/notification_item.dart';
 import 'notification_tile.dart';
 import '../common/error_display.dart';
 import '../common/loading_indicator.dart';
 
 class NotificationList extends StatelessWidget {
-  final List<Notification> notifications;
+  final List<NotificationItem> notifications;
   final bool isLoading;
   final String? error;
 

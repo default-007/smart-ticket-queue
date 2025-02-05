@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -59,7 +60,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
       // Check if widget is still mounted before navigation
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
+        GoRouter.of(context).go('/login');
       }
     } catch (e) {
       // Ensure widget is still mounted before showing snackbar

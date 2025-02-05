@@ -2,6 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:smart_ticketing/models/ticket.dart';
+import 'package:smart_ticketing/screens/profile/profile_screen.dart';
+import 'package:smart_ticketing/screens/tickets/create_ticket_screen.dart';
+import 'package:smart_ticketing/screens/tickets/ticket_detail_screen.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/splash_screen.dart';
@@ -10,10 +14,11 @@ import '../screens/dashboard/agent_dashboard.dart';
 import '../screens/tickets/ticket_list_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
+  final authNotifier = ref.watch(authProvider.notifier);
   final authState = ref.watch(authProvider);
 
   return GoRouter(
-    refreshListenable: authState,
+    refreshListenable: ValueNotifier<AuthState>(authState),
     redirect: (context, state) {
       final isLoggingIn = state.uri.path == '/login';
 
@@ -76,6 +81,30 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ProtectedRoute(
           allowedRoles: ['admin', 'agent', 'user'],
           child: TicketListScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/tickets/create',
+        builder: (context, state) => const ProtectedRoute(
+          allowedRoles: ['admin', 'agent', 'user'],
+          child: CreateTicketScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/tickets/detail',
+        builder: (context, state) {
+          final ticket = state.extra as Ticket;
+          return ProtectedRoute(
+            allowedRoles: ['admin', 'agent', 'user'],
+            child: TicketDetailScreen(ticket: ticket),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProtectedRoute(
+          allowedRoles: ['admin', 'agent', 'user'],
+          child: ProfileScreen(),
         ),
       ),
     ],

@@ -1,13 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/notification.dart';
+import 'package:smart_ticketing/services/api_service.dart';
+import '../models/notification_item.dart';
 import '../services/notification_service.dart';
 
-// Explicitly type the service provider
+final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
+
 final notificationServiceProvider = Provider<NotificationService>((ref) {
-  return NotificationService();
+  final apiService = ref.watch(apiServiceProvider);
+  final notifier = NotificationNotifier(
+    NotificationService(apiService, (notification) {}),
+  );
+
+  return NotificationService(
+    apiService,
+    (notification) {
+      notifier.addNotification(notification);
+    },
+  );
 });
 
-// Create the state notifier provider with an explicit type
 final notificationProvider =
     StateNotifierProvider<NotificationNotifier, NotificationState>((ref) {
   final service = ref.watch(notificationServiceProvider);
@@ -16,7 +27,7 @@ final notificationProvider =
 
 class NotificationState {
   final bool isLoading;
-  final List<Notification> notifications;
+  final List<NotificationItem> notifications;
   final String? error;
   final int unreadCount;
 
@@ -29,7 +40,7 @@ class NotificationState {
 
   NotificationState copyWith({
     bool? isLoading,
-    List<Notification>? notifications,
+    List<NotificationItem>? notifications,
     String? error,
     int? unreadCount,
   }) {
@@ -66,7 +77,7 @@ class NotificationNotifier extends StateNotifier<NotificationState> {
     }
   }
 
-  void addNotification(Notification notification) {
+  void addNotification(NotificationItem notification) {
     final updatedNotifications = [notification, ...state.notifications];
     state = state.copyWith(
       notifications: updatedNotifications,
@@ -79,7 +90,7 @@ class NotificationNotifier extends StateNotifier<NotificationState> {
       await _notificationService.markAsRead(notificationId);
       final updatedNotifications = state.notifications.map((notification) {
         if (notification.id == notificationId) {
-          return Notification(
+          return NotificationItem(
             id: notification.id,
             type: notification.type,
             message: notification.message,
@@ -106,7 +117,7 @@ class NotificationNotifier extends StateNotifier<NotificationState> {
     try {
       await _notificationService.markAllAsRead();
       final updatedNotifications = state.notifications.map((notification) {
-        return Notification(
+        return NotificationItem(
           id: notification.id,
           type: notification.type,
           message: notification.message,

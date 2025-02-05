@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:smart_ticketing/controllers/navigation_controller.dart';
 import '../../providers/auth_provider.dart';
 
@@ -70,7 +71,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // Handle navigation when route is set
     if (navigationState.route != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacementNamed(context, navigationState.route!);
+        GoRouter.of(context).go('/tickets');
         ref.read(navigationProvider.notifier).resetNavigation();
       });
     }
