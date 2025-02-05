@@ -7,11 +7,7 @@ import '../../providers/ticket_provider.dart';
 import '../../widgets/tickets/ticket_card.dart';
 import '../../widgets/tickets/ticket_filter.dart';
 
-// Create an initialization provider
-final initializationProvider = FutureProvider.autoDispose((ref) async {
-  await ref.read(ticketProvider.notifier).loadTickets();
-  return true;
-});
+final ticketsLoadedProvider = StateProvider<bool>((ref) => false);
 
 class TicketListScreen extends ConsumerStatefulWidget {
   const TicketListScreen({Key? key}) : super(key: key);
@@ -26,16 +22,21 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
   @override
   void initState() {
     super.initState();
-    // Load tickets after the first frame
-    /* WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(ticketProvider.notifier).loadTickets();
-    }); */
+    // Only load tickets if not already loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final isLoaded = ref.read(ticketsLoadedProvider);
+      if (!isLoaded) {
+        ref.read(ticketProvider.notifier).loadTickets();
+        ref.read(ticketsLoadedProvider.notifier).state = true;
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final initialization = ref.watch(initializationProvider);
     final ticketState = ref.watch(ticketProvider);
+    print(
+        'Ticket state: ${ticketState.tickets.length} tickets, error: ${ticketState.error}');
 
     return Scaffold(
       appBar: const CustomAppBar(title: 'Tickets'),
@@ -82,6 +83,7 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
   }
 
   Widget _buildTicketList(List tickets) {
+    print('Building ticket list with ${tickets.length} tickets: $tickets');
     if (tickets.isEmpty) {
       return const Center(
         child: Text('No tickets found'),
@@ -90,7 +92,11 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(initializationProvider);
+        // Reset loaded state and reload tickets
+        ref.read(ticketsLoadedProvider.notifier).state = false;
+        await ref
+            .read(ticketProvider.notifier)
+            .loadTickets(status: _selectedStatus);
       },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),

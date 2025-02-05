@@ -29,7 +29,7 @@ const userSchema = new mongoose.Schema(
 		role: {
 			type: String,
 			enum: ["admin", "agent", "user"],
-			default: "user",
+			default: "admin",
 		},
 	},
 	{
@@ -49,7 +49,7 @@ userSchema.pre("save", async function (next) {
 // Sign JWT token
 userSchema.methods.getSignedJwtToken = function () {
 	return jwt.sign({ id: this._id, role: this.role }, process.env.JWT_SECRET, {
-		expiresIn: "30d",
+		expiresIn: "1d",
 	});
 };
 

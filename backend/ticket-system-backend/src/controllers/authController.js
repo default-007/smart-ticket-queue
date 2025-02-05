@@ -158,3 +158,10 @@ exports.getMe = asyncHandler(async (req, res) => {
 		},
 	});
 });
+
+exports.logout = asyncHandler(async (req, res) => {
+	res.json({
+		success: true,
+		message: "Logged out successfully",
+	});
+});

@@ -1,3 +1,4 @@
+// routes/agentRoutes.js
 const express = require("express");
 const router = express.Router();
 const {
@@ -8,13 +9,20 @@ const {
 	getAgentByUserId,
 } = require("../controllers/agentController");
 const auth = require("../middleware/auth");
+const authorize = require("../middleware/authorize");
+const { checkPermission } = require("../middleware/auth");
 
-router.use(auth); // Protect all routes
+router.use(auth);
 
-router.get("/user/:userId", getAgentByUserId);
-router.get("/available", getAvailableAgents);
-router.put("/:id/status", updateStatus);
-router.put("/:id/shift", updateShift);
-router.post("/:agentId/claim/:ticketId", claimTicket);
+// Only admins and agents can access agent routes
+router.get("/user/:userId", authorize(["admin", "agent"]), getAgentByUserId);
+router.get("/available", authorize(["admin", "agent"]), getAvailableAgents);
+router.put("/:id/status", authorize(["admin", "agent"]), updateStatus);
+router.put("/:id/shift", authorize(["admin", "agent"]), updateShift);
+router.post(
+	"/:agentId/claim/:ticketId",
+	authorize(["admin", "agent"]),
+	claimTicket
+);
 
 module.exports = router;

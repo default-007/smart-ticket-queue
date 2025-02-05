@@ -1,9 +1,11 @@
+// lib/widgets/tickets/ticket_card.dart
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import '../../models/ticket.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import '../../models/ticket.dart';
+import 'sla_status_indicator.dart';
 
-class TicketCard extends StatelessWidget {
+class TicketCard extends ConsumerStatefulWidget {
   final Ticket ticket;
   final VoidCallback? onTap;
   final Function(String)? onStatusUpdate;
@@ -16,10 +18,25 @@ class TicketCard extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  ConsumerState<TicketCard> createState() => _TicketCardState();
+}
+
+class _TicketCardState extends ConsumerState<TicketCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
     return Card(
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          if (widget.onTap != null) {
+            widget.onTap!();
+          } else {
+            setState(() {
+              _expanded = !_expanded;
+            });
+          }
+        },
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -30,17 +47,37 @@ class TicketCard extends StatelessWidget {
                   _buildPriorityIndicator(),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      ticket.title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.ticket.title,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (widget.ticket.sla != null)
+                          SLAStatusIndicator(
+                            sla: widget.ticket.sla!,
+                            isCompact: true,
+                          ),
+                        const SizedBox(width: 8),
+                        _buildStatusChip(),
+                      ],
                     ),
                   ),
-                  _buildStatusChip(),
                 ],
               ),
+              if (_expanded) ...[
+                const SizedBox(height: 16),
+                Text(
+                  widget.ticket.description,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -48,39 +85,36 @@ class TicketCard extends StatelessWidget {
                   Text(
                     'Due: ${_formatDueDate()}',
                     style: TextStyle(
-                      color: ticket.isOverdue ? Colors.red : Colors.grey[600],
+                      color: widget.ticket.isOverdue
+                          ? Colors.red
+                          : Colors.grey[600],
                     ),
                   ),
                   Text(
-                    '${ticket.estimatedHours}h',
+                    '${widget.ticket.estimatedHours}h',
                     style: TextStyle(color: Colors.grey[600]),
                   ),
                 ],
               ),
-              if (ticket.assignedTo != null) ...[
+              if (widget.ticket.assignedTo != null) ...[
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     const Icon(Icons.person_outline, size: 16),
                     const SizedBox(width: 4),
-                    Text(ticket.assignedTo!.name),
+                    Text(widget.ticket.assignedTo!.name),
                   ],
                 ),
               ],
-              if (onStatusUpdate != null) ...[
+              if (_expanded && widget.ticket.sla != null) ...[
+                const SizedBox(height: 16),
+                SLAStatusIndicator(sla: widget.ticket.sla!),
+              ],
+              if (widget.onStatusUpdate != null) ...[
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => onStatusUpdate!('in-progress'),
-                      child: const Text('Start'),
-                    ),
-                    TextButton(
-                      onPressed: () => onStatusUpdate!('resolved'),
-                      child: const Text('Resolve'),
-                    ),
-                  ],
+                  children: _buildActionButtons(),
                 ),
               ],
             ],
@@ -92,7 +126,7 @@ class TicketCard extends StatelessWidget {
 
   Widget _buildPriorityIndicator() {
     Color color;
-    switch (ticket.priority) {
+    switch (widget.ticket.priority) {
       case 1:
         color = Colors.red;
         break;
@@ -124,7 +158,7 @@ class TicketCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        ticket.statusDisplay,
+        widget.ticket.statusDisplay,
         style: TextStyle(
           color: _getStatusColor(),
           fontSize: 12,
@@ -134,7 +168,7 @@ class TicketCard extends StatelessWidget {
   }
 
   Color _getStatusColor() {
-    switch (ticket.status) {
+    switch (widget.ticket.status) {
       case 'queued':
         return Colors.grey;
       case 'assigned':
@@ -145,6 +179,8 @@ class TicketCard extends StatelessWidget {
         return Colors.green;
       case 'closed':
         return Colors.purple;
+      case 'escalated':
+        return Colors.red;
       default:
         return Colors.grey;
     }
@@ -152,12 +188,49 @@ class TicketCard extends StatelessWidget {
 
   String _formatDueDate() {
     final now = DateTime.now();
-    final difference = ticket.dueDate.difference(now);
+    final difference = widget.ticket.dueDate.difference(now);
 
     if (difference.inDays.abs() <= 7) {
-      return timeago.format(ticket.dueDate);
+      return timeago.format(widget.ticket.dueDate);
     } else {
-      return DateFormat('MMM dd').format(ticket.dueDate);
+      return '${widget.ticket.dueDate.day}/${widget.ticket.dueDate.month}';
     }
+  }
+
+  List<Widget> _buildActionButtons() {
+    final List<Widget> buttons = [];
+
+    // Add buttons based on current status
+    switch (widget.ticket.status) {
+      case 'assigned':
+        buttons.add(
+          TextButton.icon(
+            onPressed: () => widget.onStatusUpdate?.call('in-progress'),
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Start'),
+          ),
+        );
+        break;
+      case 'in-progress':
+        buttons.add(
+          TextButton.icon(
+            onPressed: () => widget.onStatusUpdate?.call('resolved'),
+            icon: const Icon(Icons.check),
+            label: const Text('Resolve'),
+          ),
+        );
+        break;
+      case 'resolved':
+        buttons.add(
+          TextButton.icon(
+            onPressed: () => widget.onStatusUpdate?.call('closed'),
+            icon: const Icon(Icons.done_all),
+            label: const Text('Close'),
+          ),
+        );
+        break;
+    }
+
+    return buttons;
   }
 }

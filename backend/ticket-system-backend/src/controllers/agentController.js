@@ -18,6 +18,14 @@ exports.getAgentByUserId = asyncHandler(async (req, res) => {
 	});
 });
 
+exports.getAgentList = asyncHandler(async (req, res) => {
+	const agents = await Agent.find();
+	res.json({
+		success: true,
+		data: agents,
+	});
+});
+
 exports.updateStatus = asyncHandler(async (req, res) => {
 	const { id } = req.params;
 	const { status } = req.body;

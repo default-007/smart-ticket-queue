@@ -45,6 +45,9 @@ class TicketNotifier extends StateNotifier<TicketState> {
   TicketNotifier(this._ticketService) : super(TicketState());
 
   Future<void> loadTickets({String? status}) async {
+    // Prevent multiple simultaneous loading
+    if (state.isLoading) return;
+
     try {
       state = state.copyWith(isLoading: true, error: null);
       final tickets = await _ticketService.getTickets(status: status);

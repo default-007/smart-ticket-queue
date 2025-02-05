@@ -1,5 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'agent.dart';
+import 'sla.dart';
 
 part 'ticket.g.dart';
 
@@ -16,6 +17,9 @@ class Ticket {
   final String createdBy;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final TicketSLA? sla; // Add SLA field
+  final String department;
+  final List<String>? requiredSkills;
 
   Ticket({
     required this.id,
@@ -29,8 +33,13 @@ class Ticket {
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
+    this.sla,
+    required this.department,
+    this.requiredSkills,
   });
 
+  /* factory Ticket.fromJson(Map<String, dynamic> json) => _$TicketFromJson(json);
+  Map<String, dynamic> toJson() => _$TicketToJson(this); */
   factory Ticket.fromJson(Map<String, dynamic> json) => _$TicketFromJson(json);
   Map<String, dynamic> toJson() => _$TicketToJson(this);
 
@@ -54,5 +63,23 @@ class Ticket {
         .split('-')
         .map((word) => word[0].toUpperCase() + word.substring(1))
         .join(' ');
+  }
+
+  // Add a method to check SLA status
+  bool get isSLABreached {
+    return sla?.isBreached ?? false;
+  }
+
+  // Add a method to get time until next SLA breach
+  Duration? get timeUntilSLABreach {
+    if (sla == null) return null;
+
+    final responseTime = sla!.timeUntilResponseBreach;
+    final resolutionTime = sla!.timeUntilResolutionBreach;
+
+    if (responseTime != null && resolutionTime != null) {
+      return responseTime < resolutionTime ? responseTime : resolutionTime;
+    }
+    return responseTime ?? resolutionTime;
   }
 }

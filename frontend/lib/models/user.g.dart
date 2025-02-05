@@ -12,6 +12,9 @@ User _$UserFromJson(Map<String, dynamic> json) => User(
       email: json['email'] as String,
       role: json['role'] as String,
       token: json['token'] as String?,
+      passwordChangedAt: json['passwordChangedAt'] == null
+          ? null
+          : DateTime.parse(json['passwordChangedAt'] as String),
     );
 
 Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
@@ -20,4 +23,5 @@ Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
       'email': instance.email,
       'role': instance.role,
       'token': instance.token,
+      'passwordChangedAt': instance.passwordChangedAt?.toIso8601String(),
     };

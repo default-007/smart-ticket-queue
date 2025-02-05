@@ -106,27 +106,31 @@ class ApiService {
     }
   }
 
-  Exception _handleError(dynamic error) {
-    if (error is DioException) {
-      print('DioError type: ${error.type}');
-      print('DioError message: ${error.message}');
-      print('DioError response: ${error.response?.data}');
-      if (error.type == DioExceptionType.connectionTimeout ||
-          error.type == DioExceptionType.receiveTimeout ||
-          error.type == DioExceptionType.sendTimeout) {
-        return Exception('Connection timed out');
+  Exception _handleError(dynamic e) {
+    print('API Error: $e'); // Debug print
+
+    if (e is DioException) {
+      print('DioError response data: ${e.response?.data}'); // Debug print
+      final data = e.response?.data;
+
+      if (data != null && data['message'] != null) {
+        return Exception(data['message']);
       }
 
-      if (error.type == DioExceptionType.connectionError) {
-        return Exception('No internet connection');
-      }
-
-      final responseData = error.response?.data;
-      if (responseData != null && responseData['message'] != null) {
-        return Exception(responseData['message']);
+      switch (e.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          return Exception(
+              'Connection timeout. Please check your internet connection.');
+        case DioExceptionType.connectionError:
+          return Exception('No internet connection');
+        default:
+          return Exception('An unexpected error occurred: ${e.message}');
       }
     }
-    return Exception('An unexpected error occurred');
+
+    return Exception('Authentication failed');
   }
 
   // Token management

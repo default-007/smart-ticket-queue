@@ -20,6 +20,13 @@ Ticket _$TicketFromJson(Map<String, dynamic> json) => Ticket(
       createdBy: json['createdBy'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
+      sla: json['sla'] == null
+          ? null
+          : TicketSLA.fromJson(json['sla'] as Map<String, dynamic>),
+      department: json['department'] as String,
+      requiredSkills: (json['requiredSkills'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
     );
 
 Map<String, dynamic> _$TicketToJson(Ticket instance) => <String, dynamic>{
@@ -34,4 +41,7 @@ Map<String, dynamic> _$TicketToJson(Ticket instance) => <String, dynamic>{
       'createdBy': instance.createdBy,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
+      'sla': instance.sla,
+      'department': instance.department,
+      'requiredSkills': instance.requiredSkills,
     };

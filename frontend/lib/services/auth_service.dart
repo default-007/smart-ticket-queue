@@ -1,8 +1,45 @@
+// lib/services/auth_service.dart
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:smart_ticketing/services/api_service.dart';
 import '../config/api_config.dart';
 import '../models/user.dart';
+
+class AuthResponse {
+  final User user;
+  final String token;
+  final String refreshToken;
+
+  AuthResponse._internal({
+    required this.user,
+    required this.token,
+    required this.refreshToken,
+  });
+
+  factory AuthResponse({
+    required User user,
+    required String token,
+    required String refreshToken,
+  }) {
+    final updatedUser = user.copyWith(token: token);
+    return AuthResponse._internal(
+      user: updatedUser,
+      token: token,
+      refreshToken: refreshToken,
+    );
+  }
+
+  factory AuthResponse.fromJson(Map<String, dynamic> json) {
+    final user = User.fromJson(json['data']);
+    final token = json['token'] as String;
+    final refreshToken = json['refreshToken'] as String;
+    return AuthResponse._internal(
+      user: user.copyWith(token: token),
+      token: token,
+      refreshToken: refreshToken,
+    );
+  }
+}
 
 class AuthService {
   final ApiService _apiService;
@@ -10,7 +47,12 @@ class AuthService {
 
   AuthService(this._apiService);
 
-  // Test connection method
+  // Helper method to store auth tokens
+  Future<void> _storeTokens(String token, String refreshToken) async {
+    await _storage.write(key: 'token', value: token);
+    await _storage.write(key: 'refreshToken', value: refreshToken);
+  }
+
   Future<bool> testConnection() async {
     try {
       final response = await _apiService.get('/auth/test');
@@ -26,66 +68,65 @@ class AuthService {
     return token != null;
   }
 
-  Future<User> login(String email, String password) async {
+  Future<AuthResponse> login(String email, String password) async {
     try {
       final response = await _apiService.post(
         ApiConfig.login,
-        {
-          'email': email,
-          'password': password,
-        },
+        {'email': email, 'password': password},
       );
 
-      print('Login response: ${response.data}'); // Debug print
+      _validateAuthResponse(response.data);
+      final authResponse = AuthResponse.fromJson(response.data);
+      await _storeTokens(authResponse.token, authResponse.refreshToken);
 
-      if (response.data['token'] != null) {
-        await _apiService.setToken(response.data['token']);
-        print('Token saved successfully'); // Debug print
-      } else {
-        print('No token in response'); // Debug print
-      }
-
-      if (response.data['data'] == null) {
-        print('No user data in response'); // Debug print
-        throw Exception('Invalid response format');
-      }
-
-      return User.fromJson(response.data['data']);
+      return authResponse;
     } catch (e) {
-      print('Login error: $e'); // Debug print
       throw _handleError(e);
     }
   }
 
-  Future<User> register(String name, String email, String password) async {
+  Future<AuthResponse> register(
+      String name, String email, String password) async {
     try {
-      print('Attempting registration for email: $email'); // Debug print
       final response = await _apiService.post(
         ApiConfig.register,
-        {
-          'name': name,
-          'email': email,
-          'password': password,
-        },
+        {'name': name, 'email': email, 'password': password},
       );
 
-      print('Registration response: ${response.data}'); // Debug print
+      _validateAuthResponse(response.data);
+      final authResponse = AuthResponse.fromJson(response.data);
+      await _storeTokens(authResponse.token, authResponse.refreshToken);
 
-      if (response.data['token'] != null) {
-        await _apiService.setToken(response.data['token']);
-        print('Token saved successfully'); // Debug print
-      } else {
-        print('No token in response'); // Debug print
-      }
-
-      if (response.data['data'] == null) {
-        print('No user data in response'); // Debug print
-        throw Exception('Invalid response format');
-      }
-
-      return User.fromJson(response.data['data']);
+      return authResponse;
     } catch (e) {
-      print('Registration error: $e'); // Debug print
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> validateSession(String token) async {
+    try {
+      final response = await _apiService.get('/auth/me');
+      final user = User.fromJson(response.data['data']);
+      return {
+        'isValid': true,
+        'user': user.copyWith(token: token),
+      };
+    } catch (e) {
+      return {'isValid': false};
+    }
+  }
+
+  Future<Map<String, String>> refreshToken(String refreshToken) async {
+    try {
+      final response = await _apiService.post(
+        '/auth/refresh-token',
+        {'refreshToken': refreshToken},
+      );
+
+      final newToken = response.data['token'] as String;
+      await _storage.write(key: 'token', value: newToken);
+      return {'token': newToken};
+    } catch (e) {
       throw _handleError(e);
     }
   }
@@ -94,12 +135,8 @@ class AuthService {
     try {
       final response = await _apiService.put(
         '/auth/profile',
-        {
-          'name': name,
-          'email': email,
-        },
+        {'name': name, 'email': email},
       );
-
       return User.fromJson(response.data['data']);
     } catch (e) {
       throw _handleError(e);
@@ -111,10 +148,7 @@ class AuthService {
     try {
       await _apiService.put(
         '/auth/change-password',
-        {
-          'currentPassword': currentPassword,
-          'newPassword': newPassword,
-        },
+        {'currentPassword': currentPassword, 'newPassword': newPassword},
       );
     } catch (e) {
       throw _handleError(e);
@@ -122,22 +156,13 @@ class AuthService {
   }
 
   Future<void> logout() async {
-    await _apiService.clearToken();
-  }
-
-  Exception _handleError(dynamic e) {
-    print('Handling error: $e'); // Debug print
-    if (e is DioException) {
-      print('DioError response data: ${e.response?.data}'); // Debug print
-      final data = e.response?.data;
-      if (data != null && data['message'] != null) {
-        return Exception(data['message']);
-      }
+    try {
+      await _apiService.post('/auth/logout', {});
+    } finally {
+      await _storage.deleteAll();
     }
-    return Exception('Authentication failed');
   }
 
-  // Get current user profile
   Future<User> getCurrentUser() async {
     try {
       final response = await _apiService.get('/auth/me');
@@ -145,5 +170,35 @@ class AuthService {
     } catch (e) {
       throw _handleError(e);
     }
+  }
+
+  void _validateAuthResponse(Map<String, dynamic> data) {
+    if (data['token'] == null ||
+        data['data'] == null ||
+        data['refreshToken'] == null) {
+      throw Exception('Invalid response format');
+    }
+  }
+
+  Exception _handleError(dynamic e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data != null && data['message'] != null) {
+        return Exception(data['message']);
+      }
+
+      switch (e.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          return Exception(
+              'Connection timeout. Please check your internet connection.');
+        case DioExceptionType.connectionError:
+          return Exception('No internet connection.');
+        default:
+          return Exception('Authentication failed: ${e.message}');
+      }
+    }
+    return Exception('Authentication failed');
   }
 }

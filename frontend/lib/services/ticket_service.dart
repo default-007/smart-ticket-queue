@@ -12,11 +12,21 @@ class TicketService {
     try {
       final response = await _apiService.get('/tickets',
           params: status != null ? {'status': status} : null);
-
-      return (response.data['data'] as List)
-          .map((json) => Ticket.fromJson(json))
-          .toList();
-    } catch (e) {
+      print('Ticket response data: ${response.data}');
+      print('Data type: ${response.data.runtimeType}');
+      print('Data content: ${response.data['data']}');
+      return (response.data['data'] as List).map((json) {
+        print('Processing ticket: $json');
+        try {
+          return Ticket.fromJson(json);
+        } catch (e) {
+          print('Error parsing ticket: $e');
+          throw e;
+        }
+      }).toList();
+    } catch (e, stack) {
+      print('Error in getTickets: $e');
+      print('Stack trace: $stack');
       throw _handleError(e);
     }
   }
@@ -49,7 +59,9 @@ class TicketService {
   }
 
   Exception _handleError(dynamic e) {
+    print('Service Error: ${e.toString()}');
     if (e is DioException) {
+      print('DioError response: ${e.response?.data}');
       final data = e.response?.data;
       if (data != null && data['message'] != null) {
         return Exception(data['message']);

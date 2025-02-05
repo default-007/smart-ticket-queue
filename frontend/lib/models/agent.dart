@@ -28,8 +28,27 @@ class Agent {
     required this.department,
   });
 
-  factory Agent.fromJson(Map<String, dynamic> json) => _$AgentFromJson(json);
-  Map<String, dynamic> toJson() => _$AgentToJson(this);
+  factory Agent.fromJson(Map<String, dynamic> json) {
+    try {
+      return Agent(
+        id: json['_id']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        email: json['email']?.toString() ?? '',
+        status: json['status']?.toString() ?? '',
+        currentTicket: json['currentTicket']?.toString(),
+        shift: json['shift'] != null
+            ? AgentShift.fromJson(Map<String, dynamic>.from(json['shift']))
+            : AgentShift.defaultShift(),
+        maxTickets: (json['maxTickets'] ?? 0) as int,
+        currentLoad: (json['currentLoad'] ?? 0).toDouble(),
+        skills: List<String>.from(json['skills'] ?? []),
+        department: json['department']?.toString() ?? '',
+      );
+    } catch (e) {
+      print('Agent parsing error: $e');
+      rethrow;
+    }
+  }
 
   bool get isAvailable => status == 'online' && currentTicket == null;
 
@@ -51,7 +70,17 @@ class AgentShift {
     required this.timezone,
   });
 
-  factory AgentShift.fromJson(Map<String, dynamic> json) =>
-      _$AgentShiftFromJson(json);
-  Map<String, dynamic> toJson() => _$AgentShiftToJson(this);
+  factory AgentShift.fromJson(Map<String, dynamic> json) {
+    return AgentShift(
+      start: DateTime.parse(json['start']),
+      end: DateTime.parse(json['end']),
+      timezone: json['timezone'] ?? 'UTC',
+    );
+  }
+
+  factory AgentShift.defaultShift() {
+    final now = DateTime.now();
+    return AgentShift(
+        start: now, end: now.add(const Duration(hours: 8)), timezone: 'UTC');
+  }
 }

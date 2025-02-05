@@ -28,30 +28,46 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _handleRegister() async {
-    if (_formKey.currentState!.validate()) {
-      if (_passwordController.text != _confirmPasswordController.text) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Passwords do not match')),
-        );
-        return;
-      }
+    // Dismiss keyboard
+    FocusScope.of(context).unfocus();
 
-      try {
-        await ref.read(authProvider.notifier).register(
-              _nameController.text,
-              _emailController.text,
-              _passwordController.text,
-            );
+    // Validate form
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/login');
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString())),
+    // Check password match
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match')),
+      );
+      return;
+    }
+
+    // Check if already loading to prevent multiple submissions
+    final authState = ref.read(authProvider);
+    if (authState.isLoading) {
+      return;
+    }
+
+    try {
+      await ref.read(authProvider.notifier).register(
+            _nameController.text.trim(),
+            _emailController.text.trim(),
+            _passwordController.text,
           );
-        }
+
+      // Check if widget is still mounted before navigation
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    } catch (e) {
+      // Ensure widget is still mounted before showing snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red,
+        ));
       }
     }
   }
@@ -194,6 +210,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ? const CircularProgressIndicator()
                       : const Text('Register'),
                 ),
+                if (authState.error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Text(
+                      authState.error!,
+                      style: const TextStyle(color: Colors.red),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () {

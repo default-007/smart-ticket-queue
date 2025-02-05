@@ -11,6 +11,7 @@ import 'screens/dashboard/admin_dashboard.dart';
 import 'screens/dashboard/agent_dashboard.dart';
 import 'screens/tickets/ticket_list_screen.dart';
 import 'controllers/navigation_controller.dart';
+import 'routes/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

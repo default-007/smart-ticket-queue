@@ -11,7 +11,7 @@ class AgentService {
 
   Future<List<Agent>> getAgents() async {
     try {
-      final response = await _apiService.get('/agents');
+      final response = await _apiService.get('/agents/available');
       print('Agent response data: ${response.data}'); // Debug print
 
       if (response.data == null) {
@@ -66,7 +66,7 @@ class AgentService {
     }
   }
 
-  Future<Agent> updateShift(String agentId, AgentShift shift) async {
+  /* Future<Agent> updateShift(String agentId, AgentShift shift) async {
     try {
       final response =
           await _apiService.put('/agents/$agentId/shift', shift.toJson());
@@ -74,7 +74,7 @@ class AgentService {
     } catch (e) {
       throw _handleError(e);
     }
-  }
+  } */
 
   Future<Map<String, dynamic>> claimTicket(
       String agentId, String ticketId) async {

@@ -1,130 +1,197 @@
+// lib/providers/auth_provider.dart
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:smart_ticketing/providers/providers.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
-import '../services/api_service.dart';
 
-// Create a provider for ApiService
-final apiServiceProvider = Provider<ApiService>((ref) {
-  return ApiService();
-});
+enum AuthStatus { initial, authenticated, unauthenticated, error }
 
-// Create a provider for AuthService that depends on ApiService
-final authServiceProvider = Provider<AuthService>((ref) {
-  final apiService = ref.watch(apiServiceProvider);
-  return AuthService(apiService);
-});
-
-// Auth state provider
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final authService = ref.watch(authServiceProvider);
-  return AuthNotifier(authService);
-});
-
-class AuthState {
-  final bool isLoading;
-  final User? user;
-  final String? error;
+class AuthState extends ChangeNotifier {
+  bool isLoading;
+  AuthStatus status;
+  User? user;
+  String? error;
 
   AuthState({
     this.isLoading = false,
+    this.status = AuthStatus.initial,
     this.user,
     this.error,
   });
 
   AuthState copyWith({
     bool? isLoading,
+    AuthStatus? status,
     User? user,
     String? error,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
+      status: status ?? this.status,
       user: user ?? this.user,
       error: error,
     );
+  }
+
+  bool get isAuthenticated => status == AuthStatus.authenticated;
+
+  void update({
+    bool? isLoading,
+    AuthStatus? status,
+    User? user,
+    String? error,
+  }) {
+    this.isLoading = isLoading ?? this.isLoading;
+    this.status = status ?? this.status;
+    this.user = user ?? this.user;
+    this.error = error;
+    notifyListeners();
   }
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
+  final _storage = const FlutterSecureStorage();
+  Timer? _refreshTimer;
 
   AuthNotifier(this._authService) : super(AuthState()) {
-    _init();
+    checkAuthStatus();
   }
 
-  Future<void> _init() async {
-    final isLoggedIn = await _authService.isLoggedIn();
-    if (isLoggedIn) {
-      try {
-        final user = await _authService.getCurrentUser();
-        state = state.copyWith(user: user);
-      } catch (e) {
-        await _authService.logout();
-      }
-    }
-  }
-
-  Future<void> login(String email, String password) async {
+  Future<void> checkAuthStatus() async {
     try {
-      state = state.copyWith(isLoading: true, error: null);
-      final user = await _authService.login(email, password);
-      state = state.copyWith(isLoading: false, user: user);
+      state.update(isLoading: true);
+      final token = await _storage.read(key: 'token');
+      final refreshToken = await _storage.read(key: 'refreshToken');
+
+      if (token != null) {
+        final response = await _authService.validateSession(token);
+        if (response['isValid']) {
+          state.update(
+            isLoading: false,
+            status: AuthStatus.authenticated,
+            user: response['user'] as User, // User object includes token
+          );
+          _setupTokenRefresh();
+          return;
+        }
+
+        if (refreshToken != null) {
+          await refreshAccessToken(refreshToken);
+          return;
+        }
+      }
+
+      await logout();
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      await logout();
     }
   }
 
   Future<void> register(String name, String email, String password) async {
     try {
-      state = state.copyWith(isLoading: true, error: null);
-      final user = await _authService.register(name, email, password);
-      state = state.copyWith(isLoading: false, user: user);
-    } catch (e) {
+      // Create a new state with loading set to true
       state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
+        isLoading: true,
+        error: null,
       );
-    }
-  }
 
-  Future<void> updateProfile({
-    required String name,
-    required String email,
-  }) async {
-    try {
-      state = state.copyWith(isLoading: true, error: null);
-      final user = await _authService.updateProfile(name, email);
-      state = state.copyWith(isLoading: false, user: user);
-    } catch (e) {
+      final response = await _authService.register(name, email, password);
+
+      // Update state with successful registration
       state = state.copyWith(
         isLoading: false,
+        status: AuthStatus.authenticated,
+        user: response.user,
+      );
+
+      _setupTokenRefresh();
+    } catch (e) {
+      // Update state with error
+      state = state.copyWith(
+        isLoading: false,
+        status: AuthStatus.error,
         error: e.toString(),
       );
       throw e;
     }
   }
 
-  Future<void> changePassword({
-    required String currentPassword,
-    required String newPassword,
-  }) async {
+  Future<void> login(String email, String password) async {
     try {
-      state = state.copyWith(isLoading: true, error: null);
-      await _authService.changePassword(currentPassword, newPassword);
-      state = state.copyWith(isLoading: false);
-    } catch (e) {
-      state = state.copyWith(
+      state.update(isLoading: true, error: null);
+
+      final response = await _authService.login(email, password);
+
+      state.update(
         isLoading: false,
+        status: AuthStatus.authenticated,
+        user: response.user, // User object already includes token
+      );
+
+      _setupTokenRefresh();
+    } catch (e) {
+      state.update(
+        isLoading: false,
+        status: AuthStatus.error,
         error: e.toString(),
       );
       throw e;
     }
+  }
+
+  Future<void> refreshAccessToken(String refreshToken) async {
+    try {
+      final response = await _authService.refreshToken(refreshToken);
+
+      // Update the user object with the new token
+      final updatedUser = state.user?.copyWith(token: response['token']);
+
+      state.update(
+        user: updatedUser,
+        status: AuthStatus.authenticated,
+        isLoading: false,
+      );
+
+      _setupTokenRefresh();
+    } catch (e) {
+      await logout();
+    }
+  }
+
+  void _setupTokenRefresh() {
+    _refreshTimer?.cancel();
+    // Refresh token 5 minutes before expiry (assuming 30-minute token lifetime)
+    _refreshTimer = Timer(const Duration(minutes: 25), () async {
+      final refreshToken = await _storage.read(key: 'refreshToken');
+      if (refreshToken != null) {
+        await refreshAccessToken(refreshToken);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> logout() async {
+    _refreshTimer?.cancel();
     await _authService.logout();
-    state = AuthState();
+    state.update(
+      isLoading: false,
+      status: AuthStatus.unauthenticated,
+      user: null,
+    );
   }
 }
+
+final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  final authService = ref.watch(authServiceProvider);
+  return AuthNotifier(authService);
+});
