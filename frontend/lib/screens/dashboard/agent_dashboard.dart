@@ -41,7 +41,7 @@ class _AgentDashboardState extends ConsumerState<AgentDashboard> {
   @override
   Widget build(BuildContext context) {
     final ticketState = ref.watch(ticketProvider);
-    final authState = ref.watch(authProvider);
+    //final authState = ref.watch(authProvider);
     final agentState = ref.watch(agentProvider);
 
     // Get the current agent from the agent state

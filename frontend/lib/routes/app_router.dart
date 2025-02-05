@@ -4,8 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:smart_ticketing/models/ticket.dart';
 import 'package:smart_ticketing/screens/profile/profile_screen.dart';
+import 'package:smart_ticketing/screens/sla/sla_config_screen.dart';
+import 'package:smart_ticketing/screens/sla/sla_dashboard_screen.dart';
 import 'package:smart_ticketing/screens/tickets/create_ticket_screen.dart';
 import 'package:smart_ticketing/screens/tickets/ticket_detail_screen.dart';
+import 'package:smart_ticketing/screens/workload/workload_dashboard_screen.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/splash_screen.dart';
@@ -106,6 +109,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           allowedRoles: ['admin', 'agent', 'user'],
           child: ProfileScreen(),
         ),
+      ),
+      GoRoute(
+        path: '/sla/dashboard',
+        builder: (context, state) => const SLADashboardScreen(),
+      ),
+      GoRoute(
+        path: '/sla/config',
+        builder: (context, state) => const SLAConfigScreen(),
+      ),
+      GoRoute(
+        path: '/workload',
+        builder: (context, state) => const WorkloadDashboardScreen(),
       ),
     ],
     errorBuilder: (context, state) => ErrorScreen(

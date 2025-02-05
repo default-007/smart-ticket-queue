@@ -2,14 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:smart_ticketing/providers/auth_provider.dart';
-import 'package:smart_ticketing/screens/agents/agent_list_screen.dart';
 import 'package:smart_ticketing/services/api_service.dart';
 import 'package:smart_ticketing/services/auth_service.dart';
-import 'screens/auth/login_screen.dart';
-import 'screens/auth/register_screen.dart';
-import 'screens/dashboard/admin_dashboard.dart';
-import 'screens/dashboard/agent_dashboard.dart';
-import 'screens/tickets/ticket_list_screen.dart';
 import 'controllers/navigation_controller.dart';
 import 'routes/app_router.dart';
 
@@ -38,8 +32,7 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authProvider);
-    final navigationState = ref.watch(navigationProvider);
+    final router = ref.watch(routerProvider);
 
     // Listen to auth state changes
     ref.listen(authProvider, (previous, current) {
@@ -50,22 +43,7 @@ class MyApp extends ConsumerWidget {
       }
     });
 
-    // Determine initial route
-    Widget initialScreen = const LoginScreen();
-    if (authState.user != null) {
-      switch (authState.user!.role) {
-        case 'admin':
-          initialScreen = const AdminDashboard();
-          break;
-        case 'agent':
-          initialScreen = const AgentDashboard();
-          break;
-        default:
-          initialScreen = const TicketListScreen();
-      }
-    }
-
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Smart Ticketing',
       theme: ThemeData(
         useMaterial3: true,
@@ -77,41 +55,7 @@ class MyApp extends ConsumerWidget {
           Theme.of(context).textTheme,
         ),
       ),
-      home: initialScreen,
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/register': (context) => const RegisterScreen(),
-        '/admin/dashboard': (context) => const AdminDashboard(),
-        '/agent/dashboard': (context) => const AgentDashboard(),
-        '/tickets': (context) => const TicketListScreen(),
-        '/agents': (context) => const AgentListScreen(),
-      },
-      // Add navigation observer
-      navigatorObservers: [
-        NavigatorObserver(),
-      ],
-      // Handle navigation state changes
-      onGenerateRoute: (settings) {
-        if (navigationState.route != null) {
-          final route = navigationState.route!;
-          ref.read(navigationProvider.notifier).resetNavigation();
-          return MaterialPageRoute(
-            builder: (context) {
-              switch (route) {
-                case '/admin/dashboard':
-                  return const AdminDashboard();
-                case '/agent/dashboard':
-                  return const AgentDashboard();
-                case '/tickets':
-                  return const TicketListScreen();
-                default:
-                  return const LoginScreen();
-              }
-            },
-          );
-        }
-        return null;
-      },
+      routerConfig: router,
     );
   }
 

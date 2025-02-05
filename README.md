@@ -114,7 +114,13 @@ flutter pub get
 - Open `lib/config/api_config.dart`
 - Update base URLs for Android, iOS, and other platforms
 
-4. Run the application
+4. Generate JSON serialization code
+
+```bash
+dart run build_runner build --delete-conflicting-outputs
+```
+
+5. Run the application
 
 ```bash
 # For Android

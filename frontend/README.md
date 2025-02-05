@@ -101,8 +101,13 @@ lib/
 ## Development Tips
 
 - Run `flutter pub get` to install dependencies
+- Generate JSON serialization code: `dart run build_runner build --delete-conflicting-outputs`
 - Use `flutter analyze` to check code quality
 - Run tests with `flutter test`
+
+### JSON Serialization
+
+This project uses `json_serializable` for model generation. After making changes to model classes, run the build runner to generate corresponding `.g.dart` files.
 
 ## Contributing
 
