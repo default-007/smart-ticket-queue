@@ -17,7 +17,7 @@ import '../screens/dashboard/agent_dashboard.dart';
 import '../screens/tickets/ticket_list_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authNotifier = ref.watch(authProvider.notifier);
+  //final authNotifier = ref.watch(authProvider.notifier);
   final authState = ref.watch(authProvider);
 
   return GoRouter(

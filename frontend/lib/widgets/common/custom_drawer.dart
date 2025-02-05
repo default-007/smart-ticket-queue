@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:smart_ticketing/providers/auth_provider.dart';
 
 class CustomDrawer extends ConsumerWidget {
@@ -21,45 +22,68 @@ class CustomDrawer extends ConsumerWidget {
               child: Text(user?.name[0] ?? ''),
             ),
           ),
+          // Dashboard based on user role
           ListTile(
             leading: const Icon(Icons.dashboard),
             title: const Text('Dashboard'),
             onTap: () {
-              Navigator.pushReplacementNamed(
-                context,
-                user?.role == 'admin' ? '/admin/dashboard' : '/agent/dashboard',
-              );
+              context.go(user?.role == 'admin'
+                  ? '/admin/dashboard'
+                  : user?.role == 'agent'
+                      ? '/agent/dashboard'
+                      : '/tickets');
             },
           ),
+          // Tickets for all authenticated users
           ListTile(
             leading: const Icon(Icons.confirmation_number),
             title: const Text('Tickets'),
-            onTap: () {
-              Navigator.pushNamed(context, '/tickets');
-            },
+            onTap: () => context.go('/tickets'),
           ),
-          if (user?.role == 'admin')
+          // Create Ticket
+          ListTile(
+            leading: const Icon(Icons.add_circle_outline),
+            title: const Text('Create Ticket'),
+            onTap: () => context.go('/tickets/create'),
+          ),
+          // Admin-specific routes
+          if (user?.role == 'admin') ...[
+            const Divider(),
             ListTile(
               leading: const Icon(Icons.people),
               title: const Text('Agents'),
-              onTap: () {
-                Navigator.pushNamed(context, '/agents');
-              },
+              onTap: () => context.go('/agents'),
             ),
+            ListTile(
+              leading: const Icon(Icons.analytics),
+              title: const Text('SLA Dashboard'),
+              onTap: () => context.go('/sla/dashboard'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('SLA Configuration'),
+              onTap: () => context.go('/sla/config'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.bar_chart),
+              title: const Text('Workload Dashboard'),
+              onTap: () => context.go('/workload'),
+            ),
+          ],
+          // Profile for all authenticated users
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.person),
             title: const Text('Profile'),
-            onTap: () {
-              Navigator.pushNamed(context, '/profile');
-            },
+            onTap: () => context.go('/profile'),
           ),
-          const Divider(),
+          // Logout
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
             onTap: () {
               ref.read(authProvider.notifier).logout();
-              Navigator.pushReplacementNamed(context, '/login');
+              context.go('/login');
             },
           ),
         ],
