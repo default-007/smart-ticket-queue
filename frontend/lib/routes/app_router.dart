@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:smart_ticketing/models/ticket.dart';
+import 'package:smart_ticketing/screens/agents/agent_list_screen.dart';
+import 'package:smart_ticketing/screens/auth/register_screen.dart';
 import 'package:smart_ticketing/screens/profile/profile_screen.dart';
 import 'package:smart_ticketing/screens/sla/sla_config_screen.dart';
 import 'package:smart_ticketing/screens/sla/sla_dashboard_screen.dart';
@@ -17,13 +19,14 @@ import '../screens/dashboard/agent_dashboard.dart';
 import '../screens/tickets/ticket_list_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  //final authNotifier = ref.watch(authProvider.notifier);
+  final authNotifier = ref.watch(authProvider.notifier);
   final authState = ref.watch(authProvider);
 
   return GoRouter(
     refreshListenable: ValueNotifier<AuthState>(authState),
     redirect: (context, state) {
       final isLoggingIn = state.uri.path == '/login';
+      final isRegistering = state.uri.path == '/register';
 
       // Handle initial state
       if (authState.status == AuthStatus.initial) {
@@ -66,6 +69,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      // Dashboard Routes
+      GoRoute(
         path: '/admin/dashboard',
         builder: (context, state) => const ProtectedRoute(
           allowedRoles: ['admin'],
@@ -79,6 +87,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           child: AgentDashboard(),
         ),
       ),
+      // Ticket Routes
       GoRoute(
         path: '/tickets',
         builder: (context, state) => const ProtectedRoute(
@@ -103,6 +112,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      // Admin Routes
+      GoRoute(
+        path: '/agents',
+        builder: (context, state) => const ProtectedRoute(
+          allowedRoles: ['admin'],
+          child: AgentListScreen(),
+        ),
+      ),
+
+      // Profile Route
+
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProtectedRoute(
@@ -118,6 +138,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/sla/config',
         builder: (context, state) => const SLAConfigScreen(),
       ),
+      // Workload Route
       GoRoute(
         path: '/workload',
         builder: (context, state) => const WorkloadDashboardScreen(),
