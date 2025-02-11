@@ -4,6 +4,50 @@ const Ticket = require("../models/Ticket");
 const mongoose = require("mongoose");
 
 class WorkloadService {
+	async calculateAgentWorkload(agentId) {
+		const session = await mongoose.startSession();
+		try {
+			session.startTransaction();
+
+			const activeTickets = await Ticket.find({
+				assignedTo: agentId,
+				status: { $nin: ["resolved", "closed"] },
+			}).session(session);
+
+			const workload = await Workload.findOne({ agent: agentId }).session(
+				session
+			);
+
+			if (!workload) {
+				const newWorkload = new Workload({
+					agent: agentId,
+					currentLoad: activeTickets.reduce(
+						(total, ticket) => total + (ticket.estimatedHours || 0),
+						0
+					),
+					activeTickets: activeTickets.map((ticket) => ticket._id),
+				});
+
+				await newWorkload.save({ session });
+			} else {
+				workload.currentLoad = activeTickets.reduce(
+					(total, ticket) => total + (ticket.estimatedHours || 0),
+					0
+				);
+				workload.activeTickets = activeTickets.map((ticket) => ticket._id);
+
+				await workload.save({ session });
+			}
+
+			await session.commitTransaction();
+		} catch (error) {
+			await session.abortTransaction();
+			throw error;
+		} finally {
+			session.endSession();
+		}
+	}
+
 	async redistributeWorkload() {
 		const overloadedAgents = await Agent.find({
 			status: "online",
