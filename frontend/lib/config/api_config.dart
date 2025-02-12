@@ -4,10 +4,12 @@ class ApiConfig {
   // For Android Emulator, use 10.0.2.2 instead of localhost
   // For iOS Simulator, use localhost
   // For physical device, use your computer's IP address
+  static const String LOCAL_IP = "192.168.1.202";
+
   static String get baseUrl {
     // You might want to make this configurable based on build environment
     if (Platform.isAndroid) {
-      return 'http://10.0.2.2:5000/api';
+      return 'http://$LOCAL_IP:5000/api';
     } else if (Platform.isIOS) {
       return 'http://localhost:5000/api';
     }
@@ -20,6 +22,8 @@ class ApiConfig {
   static const String register = '/auth/register';
   static const String tickets = '/tickets';
   static const String agents = '/agents';
+  static const String workload = '/workload';
+  static const String shifts = '/shifts';
 
   // Default headers
   static Map<String, String> get headers => {

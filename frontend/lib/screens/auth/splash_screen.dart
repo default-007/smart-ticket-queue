@@ -8,14 +8,13 @@ class SplashScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Listen to auth state changes while showing splash screen
-    ref.listen<AuthState>(authProvider, (previous, current) {
-      if (current.status == AuthStatus.authenticated) {
-        // Handle navigation based on role in router
-      } else if (current.status == AuthStatus.unauthenticated) {
-        // Handle navigation in router
-      }
-    });
+    // Watch the auth state
+    final authState = ref.watch(authProvider);
+
+    // Debugging - add this to see what's happening
+    print('Auth Status: ${authState.status}');
+    print('Splash Screen - Loading: ${authState.isLoading}');
+    print('Current User: ${authState.user}');
 
     return Scaffold(
       body: Container(

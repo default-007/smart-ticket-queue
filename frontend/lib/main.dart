@@ -11,18 +11,27 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Test API connection
-  final apiService = ApiService();
+  /* final apiService = ApiService();
   final authService = AuthService(apiService);
   try {
     final isConnected = await authService.testConnection();
     print('API Connection Test: ${isConnected ? 'Success' : 'Failed'}');
   } catch (e) {
     print('API Connection Test Error: $e');
-  }
+  } */
 
   runApp(
-    const ProviderScope(
-      child: MyApp(),
+    ProviderScope(
+      child: Consumer(
+        builder: (context, ref, _) {
+          final router = ref.watch(routerProvider);
+          return MaterialApp.router(
+            routerConfig: router,
+            title: 'Smart Ticketing',
+            // ... rest of your app configuration
+          );
+        },
+      ),
     ),
   );
 }

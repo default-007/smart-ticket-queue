@@ -1,5 +1,6 @@
 // lib/providers/auth_provider.dart
 import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:smart_ticketing/providers/providers.dart';
@@ -38,6 +39,19 @@ class AuthState {
   bool get isAuthenticated => status == AuthStatus.authenticated;
 }
 
+class AuthStateNotifier extends ChangeNotifier {
+  AuthState _state;
+
+  AuthStateNotifier(this._state);
+
+  AuthState get state => _state;
+
+  void update(AuthState newState) {
+    _state = newState;
+    notifyListeners();
+  }
+}
+
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
   final _storage = const FlutterSecureStorage();
@@ -49,31 +63,50 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> checkAuthStatus() async {
     try {
-      state = state.copyWith(isLoading: true);
+      print('Checking auth status...'); // Debug print
+      state.copyWith(isLoading: true);
       final token = await _storage.read(key: 'token');
       final refreshToken = await _storage.read(key: 'refreshToken');
+      print('Token found: ${token != null}'); // Debug print
 
-      if (token != null) {
+      if (token == null) {
+        print('No token - transitioning to unauthenticated');
+        state = state.copyWith(
+          isLoading: false,
+          status: AuthStatus.unauthenticated, // This should trigger navigation
+          user: null,
+        );
+        return;
+      }
+
+      try {
         final response = await _authService.validateSession(token);
         if (response['isValid']) {
           state = state.copyWith(
             isLoading: false,
             status: AuthStatus.authenticated,
-            user: response['user'] as User, // User object includes token
+            user: response['user'] as User,
           );
           _setupTokenRefresh();
           return;
         }
-
-        if (refreshToken != null) {
-          await refreshAccessToken(refreshToken);
-          return;
-        }
+      } catch (e) {
+        print('Session validation error: $e');
       }
 
-      await logout();
+      state.copyWith(
+        isLoading: false,
+        status: AuthStatus.unauthenticated,
+        user: null,
+      );
     } catch (e) {
-      await logout();
+      print('Auth check error: $e'); // Debug print
+
+      state.copyWith(
+        isLoading: false,
+        status: AuthStatus.unauthenticated,
+        user: null,
+      );
     }
   }
 
@@ -92,6 +125,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         status: AuthStatus.authenticated,
         user: response.user,
+        error: null,
       );
 
       _setupTokenRefresh();
@@ -99,7 +133,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Update state with error
       state = state.copyWith(
         isLoading: false,
-        status: AuthStatus.error,
+        status: AuthStatus.unauthenticated,
         error: e.toString(),
       );
       throw e;
@@ -167,8 +201,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     _refreshTimer?.cancel();
-    await _authService.logout();
-    state = state.copyWith(
+    if (state.isAuthenticated) {
+      try {
+        await _authService.logout();
+      } catch (e) {
+        // If logout fails, we still want to clear local state
+        print('Logout error: $e');
+      }
+    }
+    state.copyWith(
       isLoading: false,
       status: AuthStatus.unauthenticated,
       user: null,

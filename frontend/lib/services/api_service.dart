@@ -14,6 +14,9 @@ class ApiService {
         validateStatus: (status) {
           return status! < 500;
         },
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+        sendTimeout: const Duration(seconds: 30),
       ),
     );
 
@@ -74,13 +77,21 @@ class ApiService {
 
   Future<Response> post(String path, dynamic data) async {
     try {
+      print('Attempting API call to: ${ApiConfig.baseUrl}$path');
       final response = await _dio.post(
         path,
         data: data,
       );
       return response;
     } catch (e) {
-      print('POST Request Error: $e');
+      print('POST Request Error Details:');
+      print('URL: ${ApiConfig.baseUrl}$path');
+      print('Data: $data');
+      if (e is DioException) {
+        print('Type: ${e.type}');
+        print('Message: ${e.message}');
+        print('Response: ${e.response}');
+      }
       throw _handleError(e);
     }
   }

@@ -18,46 +18,99 @@ import '../screens/dashboard/admin_dashboard.dart';
 import '../screens/dashboard/agent_dashboard.dart';
 import '../screens/tickets/ticket_list_screen.dart';
 
-final routerProvider = Provider<GoRouter>((ref) {
-  final authNotifier = ref.watch(authProvider.notifier);
+class AuthStateNotifier extends ChangeNotifier {
+  AuthState _state;
+
+  AuthStateNotifier(this._state) {
+    print(
+        'AuthStateNotifier created with state: ${_state.status}'); // Debug print
+  }
+
+  AuthState get state => _state;
+
+  void update(AuthState newState) {
+    print(
+        'AuthStateNotifier updating state: ${newState.status}'); // Debug print
+    _state = newState;
+    notifyListeners();
+  }
+}
+
+// Add authStateListenableProvider
+final authStateListenableProvider = Provider<AuthStateNotifier>((ref) {
   final authState = ref.watch(authProvider);
+  return AuthStateNotifier(authState);
+});
+
+// Update routerProvider
+final routerProvider = Provider<GoRouter>((ref) {
+  final authStateNotifier = ref.watch(authStateListenableProvider);
 
   return GoRouter(
-    refreshListenable: ValueNotifier<AuthState>(authState),
+    refreshListenable: authStateNotifier,
+    initialLocation: '/splash',
     redirect: (context, state) {
-      final isLoggingIn = state.uri.path == '/login';
-      final isRegistering = state.uri.path == '/register';
+      final authState = authStateNotifier.state;
+      final currentPath = state.uri.path;
 
-      // Handle initial state
-      if (authState.status == AuthStatus.initial) {
-        return '/splash';
+      //debug print
+      print(
+          'Router redirect - Path: $currentPath, Auth Status: ${authState.status}');
+
+      // Don't redirect if we're already at the correct location
+      /* if (currentPath == '/splash' && authState.status == AuthStatus.initial) {
+        return null;
+      } */
+
+      // Handle different auth states
+      /* switch (authState.status) {
+        case AuthStatus.initial:
+          // Only redirect to splash if we're not already there
+          return currentPath != '/splash' ? '/splash' : null;
+
+        case AuthStatus.unauthenticated:
+          // Allow splash screen to show while checking auth
+          if (currentPath == '/splash') return null;
+          // Otherwise redirect to login if not already there
+          return currentPath == '/login' ? null : '/login';
+
+        case AuthStatus.authenticated:
+          // Redirect to appropriate dashboard based on role
+          if (currentPath == '/splash' || currentPath == '/login') {
+            return _getInitialRoute(authState.user?.role);
+          }
+          return null;
+
+        default:
+          return null;
+      } */
+      // Always allow access to splash screen during initial state
+      if (authState.status == AuthStatus.initial && currentPath == '/splash') {
+        return null;
       }
 
-      // Handle unauthenticated state
-      if (authState.status == AuthStatus.unauthenticated) {
-        return isLoggingIn ? null : '/login';
+      // Direct navigation based on auth status
+      switch (authState.status) {
+        case AuthStatus.initial:
+          return currentPath != '/splash' ? '/splash' : null;
+        case AuthStatus.unauthenticated:
+        case AuthStatus.error: // Handle error state same as unauthenticated
+          if (currentPath == '/login' || currentPath == '/register') {
+            return null;
+          }
+          return '/login';
+        case AuthStatus.authenticated:
+          // Redirect authenticated users away from auth screens
+          if (currentPath == '/splash' ||
+              currentPath == '/login' ||
+              currentPath == '/register') {
+            return _getInitialRoute(authState.user?.role);
+          }
+
+          return null;
+        default:
+          return null;
       }
-
-      // Handle authenticated state
-      if (authState.status == AuthStatus.authenticated) {
-        if (isLoggingIn) {
-          return _getInitialRoute(authState.user?.role);
-        }
-
-        // Role-based route protection
-        final userRole = authState.user?.role;
-        final currentPath = state.uri.path;
-
-        if (currentPath.startsWith('/admin') && userRole != 'admin') {
-          return _getInitialRoute(userRole);
-        }
-
-        if (currentPath.startsWith('/agent') && userRole != 'agent') {
-          return _getInitialRoute(userRole);
-        }
-      }
-
-      return null;
     },
     routes: [
       GoRoute(

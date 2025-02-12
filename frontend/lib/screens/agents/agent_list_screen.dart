@@ -1,6 +1,7 @@
 // lib/screens/agents/agent_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/agent_provider.dart';
 import '../../widgets/agents/agent_card.dart';
 import '../../widgets/common/custom_app_bar.dart';
@@ -45,7 +46,7 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
               : _buildAgentList(agentState.agents),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Navigator.pushNamed(context, '/agents/create');
+          GoRouter.of(context).go('/agents/create');
         },
         child: const Icon(Icons.add),
       ),

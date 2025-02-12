@@ -223,7 +223,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () {
-                    Navigator.pushReplacementNamed(context, '/login');
+                    GoRouter.of(context).go('/login');
                   },
                   child: const Text('Already have an account? Login'),
                 ),
