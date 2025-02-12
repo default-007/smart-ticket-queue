@@ -90,15 +90,23 @@ class AuthService {
     try {
       final response = await _apiService.post(
         ApiConfig.register,
-        {'name': name, 'email': email, 'password': password},
+        {
+          'name': name,
+          'email': email,
+          'password': password,
+        },
       );
 
-      _validateAuthResponse(response.data);
-      final authResponse = AuthResponse.fromJson(response.data);
-      await _storeTokens(authResponse.token, authResponse.refreshToken);
-
-      return authResponse;
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return AuthResponse.fromJson(response.data);
+      } else {
+        throw Exception(response.data['message'] ?? 'Registration failed');
+      }
     } catch (e) {
+      if (e is DioException && e.type == DioExceptionType.connectionTimeout) {
+        throw Exception(
+            'Could not connect to server. Please check your connection and try again.');
+      }
       throw _handleError(e);
     }
   }

@@ -8,9 +8,6 @@ const rateLimit = require("express-rate-limit");
 const morgan = require("morgan");
 require("dotenv").config();
 
-const ticketRoutes = require("./src/routes/ticketRoutes");
-const agentRoutes = require("./src/routes/agentRoutes");
-const authRoutes = require("./src/routes/authRoutes");
 const errorHandler = require("./src/middleware/errorHandler");
 const WebSocketService = require("./src/services/websocketService");
 const SchedulerService = require("./src/services/schedulerService");
@@ -27,8 +24,19 @@ global.io = wsService.io;
 let scheduler = null;
 
 // Middleware
-app.use(helmet());
-app.use(cors());
+app.use(
+	helmet({
+		crossOriginResourcePolicy: { policy: "cross-origin" },
+	})
+);
+app.use(
+	cors({
+		origin: "*", // Allow all origins for testing
+		methods: ["GET", "POST", "PUT", "DELETE"],
+		allowedHeaders: ["Content-Type", "Authorization"],
+		credentials: true,
+	})
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
@@ -49,7 +57,19 @@ app.use("/api/sla", require("./src/routes/slaRoutes"));
 
 // Base route for testing
 app.get("/", (req, res) => {
+	console.log("Base route hit");
 	res.json({ message: "API is running" });
+});
+
+// Test route before auth routes
+app.get("/api/test", (req, res) => {
+	console.log("Test route hit");
+	res.json({ message: "Test successful" });
+});
+
+app.post("/api/auth/register", (req, res, next) => {
+	console.log("Received registration request:", req.body);
+	next();
 });
 
 // Error handling
@@ -68,14 +88,23 @@ mongoose
 		console.log("Connected to MongoDB");
 		// Initialize scheduler after database connection
 		scheduler = new SchedulerService();
-		server.listen(PORT, () => {
+		server.listen(PORT, "0.0.0.0", () => {
 			console.log(`Server is running on port ${PORT}`);
+			console.log(`- Network: http://192.168.100.115:${PORT}`);
+			console.log(
+				`- Try test endpoint: http://192.168.100.115:${PORT}/api/test`
+			);
 		});
 	})
 	.catch((err) => {
 		console.error("MongoDB connection error:", err);
 		process.exit(1);
 	});
+
+// error event listener to the server
+server.on("error", (error) => {
+	console.error("Server error:", error);
+});
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (err) => {

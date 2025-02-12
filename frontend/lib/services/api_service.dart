@@ -56,6 +56,15 @@ class ApiService {
             print('Token cleared due to 401 error');
             // Add code navigate to login screen here later
           }
+          if (error.type == DioExceptionType.connectionTimeout) {
+            return handler.reject(
+              DioException(
+                requestOptions: error.requestOptions,
+                error:
+                    'Could not connect to server. Please check your connection.',
+              ),
+            );
+          }
           return handler.next(error);
         },
       ),
