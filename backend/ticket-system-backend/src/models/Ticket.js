@@ -1,111 +1,131 @@
+// src/models/Ticket.js
 const mongoose = require("mongoose");
 
-const agentSchema = new mongoose.Schema(
+const ticketHistorySchema = new mongoose.Schema({
+	action: {
+		type: String,
+		enum: [
+			"created",
+			"updated",
+			"assigned",
+			"reassigned",
+			"escalated",
+			"handover",
+			"resolved",
+			"closed",
+			"sla_breach",
+			"status_updated",
+			"requeued",
+		],
+		required: true,
+	},
+	performedBy: {
+		type: mongoose.Schema.Types.ObjectId,
+		ref: "User",
+	},
+	timestamp: {
+		type: Date,
+		default: Date.now,
+	},
+	details: {
+		type: mongoose.Schema.Types.Mixed,
+	},
+});
+
+const slaSchema = new mongoose.Schema({
+	responseTime: {
+		deadline: Date,
+		met: {
+			type: Boolean,
+			default: false,
+		},
+	},
+	resolutionTime: {
+		deadline: Date,
+		met: {
+			type: Boolean,
+			default: false,
+		},
+	},
+	escalationLevel: {
+		type: Number,
+		default: 0,
+	},
+	lastEscalation: Date,
+});
+
+const ticketSchema = new mongoose.Schema(
 	{
-		name: {
+		title: {
 			type: String,
-			required: [true, "Please provide agent name"],
+			required: [true, "Please provide ticket title"],
 			trim: true,
 		},
-		email: {
+		description: {
 			type: String,
-			required: [true, "Please provide agent email"],
-			unique: true,
+			required: [true, "Please provide ticket description"],
 			trim: true,
-			lowercase: true,
 		},
 		status: {
 			type: String,
-			enum: ["online", "offline", "busy", "break"],
-			default: "offline",
+			enum: [
+				"queued",
+				"assigned",
+				"in-progress",
+				"resolved",
+				"closed",
+				"escalated",
+			],
+			default: "queued",
 		},
-		currentTicket: {
+		priority: {
+			type: Number,
+			required: true,
+			enum: [1, 2, 3], // 1: High, 2: Medium, 3: Low
+			default: 2,
+		},
+		category: {
+			type: String,
+			enum: ["technical", "billing", "general", "urgent"],
+			default: "general",
+		},
+		dueDate: {
+			type: Date,
+			required: true,
+		},
+		estimatedHours: {
+			type: Number,
+			required: true,
+			default: 1,
+		},
+		assignedTo: {
 			type: mongoose.Schema.Types.ObjectId,
-			ref: "Ticket",
+			ref: "Agent",
 			default: null,
 		},
-		activeTickets: [
-			{
-				type: mongoose.Schema.Types.ObjectId,
-				ref: "Ticket",
-			},
-		],
-		shift: {
-			start: {
-				type: Date,
-				required: true,
-			},
-			end: {
-				type: Date,
-				required: true,
-			},
-			timezone: {
-				type: String,
-				default: "UTC",
-			},
-			breaks: [
-				{
-					start: Date,
-					end: Date,
-					type: {
-						type: String,
-						enum: ["lunch", "short-break"],
-					},
-				},
-			],
+		createdBy: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "User",
+			required: true,
 		},
-		maxTickets: {
-			type: Number,
-			default: 5,
-		},
-		currentLoad: {
-			type: Number,
-			default: 0,
-		},
-		skills: [
-			{
-				name: String,
-				level: {
-					type: Number,
-					min: 1,
-					max: 5,
-				},
-			},
-		],
 		department: {
 			type: String,
 			required: true,
-			trim: true,
+			default: "general",
 		},
-		teams: [
-			{
-				type: String,
-				trim: true,
-			},
-		],
-		specializations: [
-			{
-				type: String,
-				trim: true,
-			},
-		],
-		performance: {
-			averageResolutionTime: Number,
-			ticketsResolved: Number,
-			customerSatisfaction: Number,
-			slaComplianceRate: Number,
+		requiredSkills: [String],
+		sla: {
+			type: slaSchema,
+			default: () => ({}),
 		},
-		availability: {
-			nextAvailableSlot: Date,
-			workingHours: {
-				type: Map,
-				of: {
-					start: String,
-					end: String,
-					isWorkingDay: Boolean,
-				},
-			},
+		escalationLevel: {
+			type: Number,
+			default: 0,
 		},
+		history: [ticketHistorySchema],
+		firstResponseTime: Date,
+		resolvedAt: Date,
+		resolutionTime: Number, // in minutes
 	},
 	{
 		timestamps: true,
@@ -113,48 +133,64 @@ const agentSchema = new mongoose.Schema(
 );
 
 // Indexes
-agentSchema.index({ status: 1, currentLoad: 1 });
-agentSchema.index({ department: 1, "skills.name": 1 });
-agentSchema.index({ "shift.start": 1, "shift.end": 1 });
+ticketSchema.index({ status: 1, priority: 1, createdAt: -1 });
+ticketSchema.index({ assignedTo: 1, status: 1 });
+ticketSchema.index({ createdBy: 1, status: 1 });
+ticketSchema.index({ dueDate: 1 });
+ticketSchema.index({ priority: 1, dueDate: 1 });
+ticketSchema.index({ "sla.responseTime.deadline": 1 });
+ticketSchema.index({ "sla.resolutionTime.deadline": 1 });
 
 // Methods
-agentSchema.methods.isAvailable = function () {
-	const now = new Date();
+ticketSchema.methods.isOverdue = function () {
 	return (
-		this.status === "online" &&
-		this.currentLoad < this.maxTickets &&
-		now > this.shift.start &&
-		now < this.shift.end &&
-		!this.isOnBreak()
+		this.dueDate < new Date() &&
+		this.status !== "resolved" &&
+		this.status !== "closed"
 	);
 };
 
-agentSchema.methods.isOnBreak = function () {
-	const now = new Date();
-	return this.shift.breaks.some(
-		(breakPeriod) => now >= breakPeriod.start && now <= breakPeriod.end
-	);
-};
-
-agentSchema.methods.canHandleTicket = function (ticket) {
-	const estimatedEndTime = new Date(
-		Date.now() + ticket.estimatedHours * 60 * 60 * 1000
-	);
+ticketSchema.methods.needsEscalation = function () {
 	return (
-		this.isAvailable() &&
-		estimatedEndTime <= this.shift.end &&
-		this.hasRequiredSkills(ticket)
+		this.sla &&
+		((this.sla.responseTime &&
+			!this.sla.responseTime.met &&
+			new Date() > this.sla.responseTime.deadline) ||
+			(this.sla.resolutionTime &&
+				!this.sla.resolutionTime.met &&
+				new Date() > this.sla.resolutionTime.deadline))
 	);
 };
 
-agentSchema.methods.hasRequiredSkills = function (ticket) {
-	// Check if agent has the required skills for the ticket
-	return ticket.requiredSkills.every((requiredSkill) =>
-		this.skills.some(
-			(skill) =>
-				skill.name === requiredSkill.name && skill.level >= requiredSkill.level
-		)
-	);
-};
+// Pre-save hook for SLA initialization
+ticketSchema.pre("save", async function (next) {
+	if (this.isNew && !this.sla?.responseTime?.deadline) {
+		try {
+			// Instead of requiring SLAService directly, calculate deadlines here
+			const config = (await SLAConfig.findOne({
+				priority: this.priority,
+				category: this.category,
+			})) || {
+				responseTime: 60,
+				resolutionTime: 480,
+			};
 
-module.exports = mongoose.model("Agent", agentSchema);
+			const now = new Date();
+			this.sla = {
+				responseTime: {
+					deadline: new Date(now.getTime() + config.responseTime * 60000),
+					met: false,
+				},
+				resolutionTime: {
+					deadline: new Date(now.getTime() + config.resolutionTime * 60000),
+					met: false,
+				},
+			};
+		} catch (error) {
+			console.error("Error initializing SLA for ticket:", error);
+		}
+	}
+	next();
+});
+
+module.exports = mongoose.model("Ticket", ticketSchema);

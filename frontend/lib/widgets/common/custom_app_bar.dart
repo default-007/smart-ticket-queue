@@ -6,12 +6,14 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final String title;
   final List<Widget>? actions;
   final bool automaticallyImplyLeading;
+  final bool showDrawerButton;
 
   const CustomAppBar({
     Key? key,
     required this.title,
     this.actions,
     this.automaticallyImplyLeading = true,
+    this.showDrawerButton = true,
   }) : super(key: key);
 
   @override
@@ -22,20 +24,29 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
     return AppBar(
       title: Text(title),
       automaticallyImplyLeading: automaticallyImplyLeading,
+      leading: showDrawerButton && automaticallyImplyLeading
+          ? Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.menu),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              ),
+            )
+          : null,
       actions: [
         if (actions != null) ...actions!,
-        IconButton(
-          icon: CircleAvatar(
-            radius: 14,
-            child: Text(
-              user?.name.substring(0, 1).toUpperCase() ?? 'U',
-              style: const TextStyle(fontSize: 12),
+        if (user != null)
+          IconButton(
+            icon: CircleAvatar(
+              radius: 14,
+              child: Text(
+                user.name.substring(0, 1).toUpperCase(),
+                style: const TextStyle(fontSize: 12),
+              ),
             ),
+            onPressed: () {
+              Navigator.pushNamed(context, '/profile');
+            },
           ),
-          onPressed: () {
-            Navigator.pushNamed(context, '/profile');
-          },
-        ),
         const SizedBox(width: 8),
       ],
     );

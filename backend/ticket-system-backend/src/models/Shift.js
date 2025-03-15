@@ -1,3 +1,5 @@
+const mongoose = require("mongoose");
+
 const breakSchema = new mongoose.Schema({
 	type: {
 		type: String,
@@ -43,3 +45,5 @@ const shiftSchema = new mongoose.Schema(
 		timestamps: true,
 	}
 );
+
+module.exports = mongoose.model("Shift", shiftSchema);

@@ -1,10 +1,11 @@
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kDebugMode;
 
 class ApiConfig {
   // For Android Emulator, use 10.0.2.2 instead of localhost
   // For iOS Simulator, use localhost
   // For physical device, use your computer's IP address
-  static const String LOCAL_IP = "192.168.100.115";
+  static const String LOCAL_IP = "192.168.1.66";
 
   static String get baseUrl {
     // You might want to make this configurable based on build environment
@@ -14,7 +15,7 @@ class ApiConfig {
       return 'http://localhost:5000/api';
     }
     // Default fallback
-    return 'http://192.168.100.115:5000/api'; // Replace X with your local IP
+    return 'http://192.168.1.66:5000/api'; // Replace X with your local IP
   }
 
   // API Endpoints

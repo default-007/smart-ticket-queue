@@ -9,13 +9,18 @@ class NotificationService {
   final ApiService _apiService;
   late IO.Socket _socket;
   final FlutterLocalNotificationsPlugin _localNotifications;
-  final Function(NotificationItem) onNewNotification;
+  Function(NotificationItem)? onNewNotification; // Make it nullable
 
-  NotificationService(
-    this._apiService,
-    this.onNewNotification,
-  ) : _localNotifications = FlutterLocalNotificationsPlugin() {
+  NotificationService(this._apiService,
+      [this.onNewNotification] // Make it optional
+      )
+      : _localNotifications = FlutterLocalNotificationsPlugin() {
     _initializeLocalNotifications();
+  }
+
+  // Add this method to set the callback after initialization
+  void setNotificationCallback(Function(NotificationItem) callback) {
+    onNewNotification = callback;
   }
 
   Future<void> _initializeLocalNotifications() async {
@@ -75,8 +80,10 @@ class NotificationService {
     // Show local notification
     _showLocalNotification(notification);
 
-    // Call callback for UI updates
-    onNewNotification(notification);
+    // Call callback for UI updates if it exists
+    if (onNewNotification != null) {
+      onNewNotification!(notification);
+    }
   }
 
   Future<void> _showLocalNotification(NotificationItem notification) async {
@@ -130,12 +137,17 @@ class NotificationService {
   Future<List<NotificationItem>> getUnreadNotifications() async {
     try {
       final response = await _apiService.get('/notifications/unread');
-      return (response.data['data'] as List)
+      if (response.data == null || response.data['data'] == null) {
+        return [];
+      }
+
+      List<dynamic> notificationList = response.data['data'] as List;
+      return notificationList
           .map((json) => NotificationItem.fromJson(json))
           .toList();
     } catch (e) {
       print('Error fetching unread notifications: $e');
-      rethrow;
+      return [];
     }
   }
 
@@ -154,6 +166,20 @@ class NotificationService {
     } catch (e) {
       print('Error marking all notifications as read: $e');
       rethrow;
+    }
+  }
+
+  // Add method to get current user ID
+  Future<String?> getCurrentUserId() async {
+    try {
+      final response = await _apiService.get('/auth/me');
+      if (response.data != null && response.data['data'] != null) {
+        return response.data['data']['id'].toString();
+      }
+      return null;
+    } catch (e) {
+      print('Error getting current user ID: $e');
+      return null;
     }
   }
 

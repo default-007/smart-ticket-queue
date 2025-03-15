@@ -4,12 +4,14 @@ import 'agent_status_badge.dart';
 
 class AgentCard extends StatelessWidget {
   final Agent agent;
-  final VoidCallback? onTap; // Added onTap parameter
+  final VoidCallback? onTap;
+  final VoidCallback? onEdit;
 
   const AgentCard({
     Key? key,
     required this.agent,
-    this.onTap, // Added to constructor
+    this.onTap,
+    this.onEdit,
   }) : super(key: key);
 
   @override
@@ -17,7 +19,6 @@ class AgentCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: InkWell(
-        // Wrapped with InkWell for tap effect
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -49,6 +50,11 @@ class AgentCard extends StatelessWidget {
                     status: agent.status,
                     isOnShift: agent.isOnShift,
                   ),
+                  if (onEdit != null)
+                    IconButton(
+                      icon: const Icon(Icons.edit),
+                      onPressed: onEdit,
+                    ),
                 ],
               ),
               const Divider(height: 24),

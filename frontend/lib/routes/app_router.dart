@@ -2,10 +2,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:smart_ticketing/models/agent.dart';
 import 'package:smart_ticketing/models/ticket.dart';
+import 'package:smart_ticketing/screens/agents/agent_form_screen.dart';
 import 'package:smart_ticketing/screens/agents/agent_list_screen.dart';
 import 'package:smart_ticketing/screens/auth/register_screen.dart';
 import 'package:smart_ticketing/screens/profile/profile_screen.dart';
+import 'package:smart_ticketing/screens/shifts/shift_management_screen.dart';
 import 'package:smart_ticketing/screens/sla/sla_config_screen.dart';
 import 'package:smart_ticketing/screens/sla/sla_dashboard_screen.dart';
 import 'package:smart_ticketing/screens/tickets/create_ticket_screen.dart';
@@ -173,6 +176,23 @@ final routerProvider = Provider<GoRouter>((ref) {
           child: AgentListScreen(),
         ),
       ),
+      GoRoute(
+        path: '/agents/create',
+        builder: (context, state) => const ProtectedRoute(
+          allowedRoles: ['admin'],
+          child: AgentFormScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/agents/edit/:id',
+        builder: (context, state) {
+          final agent = state.extra as Agent;
+          return ProtectedRoute(
+            allowedRoles: ['admin'],
+            child: AgentFormScreen(agent: agent),
+          );
+        },
+      ),
 
       // Profile Route
 
@@ -196,6 +216,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/workload',
         builder: (context, state) => const WorkloadDashboardScreen(),
       ),
+      GoRoute(
+        path: '/shifts',
+        builder: (context, state) => const ProtectedRoute(
+          allowedRoles: ['admin', 'agent'],
+          child: ShiftManagementScreen(
+              agentId: ''), // You'll need to pass the actual agentId
+        ),
+      ),
     ],
     errorBuilder: (context, state) => ErrorScreen(
       error: state.error?.toString() ?? 'Unknown error occurred',
@@ -217,11 +245,13 @@ String _getInitialRoute(String? role) {
 class ProtectedRoute extends ConsumerWidget {
   final Widget child;
   final List<String> allowedRoles;
+  final bool adminOverride;
 
   const ProtectedRoute({
     Key? key,
     required this.child,
     required this.allowedRoles,
+    this.adminOverride = true,
   }) : super(key: key);
 
   @override
@@ -233,6 +263,12 @@ class ProtectedRoute extends ConsumerWidget {
     }
 
     final userRole = authState.user?.role;
+
+    // Admin override: if enabled, admins can access everything
+    if (adminOverride && userRole == 'admin') {
+      return child;
+    }
+
     if (userRole == null || !allowedRoles.contains(userRole)) {
       return UnauthorizedScreen(
         onRedirect: () {

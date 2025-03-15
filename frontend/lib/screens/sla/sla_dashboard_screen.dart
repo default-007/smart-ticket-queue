@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:smart_ticketing/widgets/common/custom_drawer.dart';
 import '../../providers/sla_provider.dart';
 import '../../widgets/common/custom_app_bar.dart';
 import 'widgets/sla_metrics_card.dart';
@@ -16,7 +18,9 @@ class SLADashboardScreen extends ConsumerWidget {
     return Scaffold(
       appBar: const CustomAppBar(
         title: 'SLA Dashboard',
+        showDrawerButton: true, // Explicitly set to true
       ),
+      drawer: const CustomDrawer(),
       body: RefreshIndicator(
         onRefresh: () async {
           await ref.read(slaProvider.notifier).loadSLAMetrics();
@@ -68,7 +72,7 @@ class SLADashboardScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Navigator.pushNamed(context, '/sla/config');
+          GoRouter.of(context).push('/sla/config');
         },
         child: const Icon(Icons.settings),
       ),

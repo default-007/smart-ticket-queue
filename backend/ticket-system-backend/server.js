@@ -41,6 +41,18 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 
+app.use((err, req, res, next) => {
+	if (err instanceof ReferenceError) {
+		console.error("Reference Error:", err);
+		return res.status(500).json({
+			success: false,
+			message: "Server configuration error. Please contact an administrator.",
+			error: process.env.NODE_ENV === "development" ? err.message : undefined,
+		});
+	}
+	next(err);
+});
+
 // Rate limiting
 const limiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
@@ -54,6 +66,7 @@ app.use("/api/tickets", require("./src/routes/ticketRoutes"));
 app.use("/api/agents", require("./src/routes/agentRoutes"));
 app.use("/api/notifications", require("./src/routes/notificationRoutes"));
 app.use("/api/sla", require("./src/routes/slaRoutes"));
+app.use("/api/workload", require("./src/routes/workloadRoutes"));
 
 // Base route for testing
 app.get("/", (req, res) => {
@@ -90,10 +103,6 @@ mongoose
 		scheduler = new SchedulerService();
 		server.listen(PORT, "0.0.0.0", () => {
 			console.log(`Server is running on port ${PORT}`);
-			console.log(`- Network: http://192.168.100.115:${PORT}`);
-			console.log(
-				`- Try test endpoint: http://192.168.100.115:${PORT}/api/test`
-			);
 		});
 	})
 	.catch((err) => {

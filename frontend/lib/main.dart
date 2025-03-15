@@ -1,27 +1,69 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:smart_ticketing/config/api_config.dart';
 import 'package:smart_ticketing/providers/auth_provider.dart';
+import 'package:smart_ticketing/providers/notification_provider.dart';
 import 'package:smart_ticketing/services/api_service.dart';
 import 'package:smart_ticketing/services/auth_service.dart';
 import 'controllers/navigation_controller.dart';
 import 'routes/app_router.dart';
 
+/* void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  runApp(
+    ProviderScope(
+      child: Consumer(
+        builder: (context, ref, _) {
+          final router = ref.watch(routerProvider);
+          return MaterialApp.router(
+            routerConfig: router,
+            title: 'Smart Ticketing',
+            // ... rest of your app configuration
+          );
+        },
+      ),
+    ),
+  );
+} */
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Test API connection
-  /* final apiService = ApiService();
+  final apiService = ApiService();
   final authService = AuthService(apiService);
-  try {
-    final isConnected = await authService.testConnection();
+  /* try {
+    print('Testing API connection...');
+    final testEndpoint = '/auth/test'; // Simple test endpoint
+    final isConnected =
+        await ApiConfig.testConnection(() => apiService.get(testEndpoint));
     print('API Connection Test: ${isConnected ? 'Success' : 'Failed'}');
+
+    if (!isConnected) {
+      // Try alternate connection for debugging
+      print('Trying direct API test...');
+      try {
+        await authService.testConnection();
+        print('Direct connection test succeeded');
+      } catch (e) {
+        print('Direct connection test failed: $e');
+      }
+    }
   } catch (e) {
     print('API Connection Test Error: $e');
   } */
 
+  // Create a ProviderContainer for manual initialization of providers
+  final container = ProviderContainer();
+
+  // Initialize the notification callback to break the dependency cycle
+  initializeNotificationCallback(container);
+
   runApp(
-    ProviderScope(
+    UncontrolledProviderScope(
+      container: container,
       child: Consumer(
         builder: (context, ref, _) {
           final router = ref.watch(routerProvider);

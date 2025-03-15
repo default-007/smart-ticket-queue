@@ -1,3 +1,6 @@
+// src/models/Workload.js
+const mongoose = require("mongoose");
+
 const workloadSchema = new mongoose.Schema(
 	{
 		agent: {
@@ -41,3 +44,13 @@ const workloadSchema = new mongoose.Schema(
 		timestamps: true,
 	}
 );
+
+// Add indexes for better query performance
+workloadSchema.index({ agent: 1 });
+workloadSchema.index({ currentLoad: 1 });
+
+// Create the model
+const Workload = mongoose.model("Workload", workloadSchema);
+
+// Export the model
+module.exports = Workload;

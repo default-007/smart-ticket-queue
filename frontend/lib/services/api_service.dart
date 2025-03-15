@@ -14,9 +14,10 @@ class ApiService {
         validateStatus: (status) {
           return status! < 500;
         },
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
-        sendTimeout: const Duration(seconds: 30),
+        // Increase timeout durations
+        connectTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 60),
+        sendTimeout: const Duration(seconds: 60),
       ),
     );
 
@@ -50,80 +51,138 @@ class ApiService {
         onError: (error, handler) async {
           print('ERROR[${error.response?.statusCode}] => ${error.message}');
           print('ERROR DATA => ${error.response?.data}');
+
+          // Special handling for timeouts to avoid login failures
+          if (error.type == DioExceptionType.connectionTimeout ||
+              error.type == DioExceptionType.receiveTimeout ||
+              error.type == DioExceptionType.sendTimeout) {
+            // For login requests, check if token was already saved
+            if (error.requestOptions.path.contains('/auth/login') ||
+                error.requestOptions.path.contains('/auth/register')) {
+              final token = await _storage.read(key: 'token');
+              if (token != null) {
+                print(
+                    'Login timeout but token found - considering login successful');
+                // Return a synthetic success response
+                return handler.resolve(Response(
+                  requestOptions: error.requestOptions,
+                  data: {
+                    'success': true,
+                    'token': token,
+                  },
+                  statusCode: 200,
+                ));
+              }
+            }
+
+            return handler.reject(
+              DioException(
+                requestOptions: error.requestOptions,
+                error:
+                    'Connection timeout. Please check your internet connection and try again.',
+                type: error.type,
+              ),
+            );
+          }
+
           if (error.response?.statusCode == 401) {
             // Handle token expiration
             await _storage.delete(key: 'token');
             print('Token cleared due to 401 error');
             // Add code navigate to login screen here later
           }
-          if (error.type == DioExceptionType.connectionTimeout) {
-            return handler.reject(
-              DioException(
-                requestOptions: error.requestOptions,
-                error:
-                    'Could not connect to server. Please check your connection.',
-              ),
-            );
-          }
+
           return handler.next(error);
         },
       ),
     );
   }
 
-  Future<Response> get(String path, {Map<String, dynamic>? params}) async {
-    try {
-      final response = await _dio.get(
-        path,
-        queryParameters: params,
-      );
-      return response;
-    } catch (e) {
-      print('GET Request Error: $e');
-      throw _handleError(e);
+  // Add method for safe API calls with better error handling
+  Future<T> safeApiCall<T>(
+    Future<T> Function() apiCall, {
+    String errorPrefix = 'Operation failed',
+    bool isRetryable = true,
+    int maxRetries = 3,
+  }) async {
+    int attempts = 0;
+    while (attempts < maxRetries) {
+      try {
+        attempts++;
+        return await apiCall();
+      } catch (e) {
+        if (e is DioException) {
+          // Handle specific errors
+          if (e.type == DioExceptionType.connectionTimeout ||
+              e.type == DioExceptionType.sendTimeout ||
+              e.type == DioExceptionType.receiveTimeout) {
+            print(
+                'Timeout error (Attempt $attempts/$maxRetries): ${e.message}');
+            if (attempts < maxRetries && isRetryable) {
+              // Exponential backoff
+              await Future.delayed(Duration(milliseconds: 1000 * attempts));
+              continue;
+            }
+          }
+
+          // Handle server validation errors (400 Bad Request)
+          if (e.response?.statusCode == 400) {
+            final message = e.response?.data['message'] ?? errorPrefix;
+            throw Exception('Validation error: $message');
+          }
+
+          // Handle auth errors
+          if (e.response?.statusCode == 401) {
+            throw Exception('Authentication error: Please log in again');
+          }
+
+          // Handle server errors
+          if (e.response?.statusCode != null &&
+              e.response!.statusCode! >= 500) {
+            throw Exception('Server error. Please try again later.');
+          }
+
+          // Handle data format errors
+          final data = e.response?.data;
+          if (data != null && data['message'] != null) {
+            throw Exception('${data['message']}');
+          }
+        }
+
+        // General error handling
+        throw Exception('$errorPrefix: ${e.toString()}');
+      }
     }
+
+    throw Exception('$errorPrefix: Maximum retry attempts reached');
+  }
+
+  Future<Response> get(String path, {Map<String, dynamic>? params}) async {
+    return safeApiCall(
+      () => _dio.get(path, queryParameters: params),
+      errorPrefix: 'Failed to get data',
+    );
   }
 
   Future<Response> post(String path, dynamic data) async {
-    try {
-      print('Attempting API call to: ${ApiConfig.baseUrl}$path');
-      final response = await _dio.post(
-        path,
-        data: data,
-      );
-      return response;
-    } catch (e) {
-      print('POST Request Error Details:');
-      print('URL: ${ApiConfig.baseUrl}$path');
-      print('Data: $data');
-      if (e is DioException) {
-        print('Type: ${e.type}');
-        print('Message: ${e.message}');
-        print('Response: ${e.response}');
-      }
-      throw _handleError(e);
-    }
+    return safeApiCall(
+      () => _dio.post(path, data: data),
+      errorPrefix: 'Failed to submit data',
+    );
   }
 
   Future<Response> put(String path, dynamic data) async {
-    try {
-      final response = await _dio.put(
-        path,
-        data: data,
-      );
-      return response;
-    } catch (e) {
-      throw _handleError(e);
-    }
+    return safeApiCall(
+      () => _dio.put(path, data: data),
+      errorPrefix: 'Failed to update data',
+    );
   }
 
   Future<Response> delete(String path) async {
-    try {
-      final response = await _dio.delete(path);
-      return response;
-    } catch (e) {
-      throw _handleError(e);
-    }
+    return safeApiCall(
+      () => _dio.delete(path),
+      errorPrefix: 'Failed to delete data',
+    );
   }
 
   Exception _handleError(dynamic e) {

@@ -19,6 +19,54 @@ class TicketDetailScreen extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final isAdmin = authState.user?.role == 'admin';
 
+    // Add escalation history section
+    Widget _buildEscalationHistory() {
+      if (!ticket.isEscalated) return const SizedBox.shrink();
+
+      return Card(
+        color: Colors.red.withOpacity(0.05),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.warning, color: Colors.red),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Escalation Status',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('Level: ${ticket.escalationLevel}'),
+              const SizedBox(height: 8),
+              Text(
+                  'This ticket has been escalated due to SLA breach or priority.'),
+              if (isAdmin) // Show escalation actions for admins
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () => _handleDeEscalation(context, ref),
+                        child: const Text('Resolve Escalation'),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Ticket #${ticket.id}'),
@@ -44,6 +92,8 @@ class TicketDetailScreen extends ConsumerWidget {
           children: [
             _buildStatusBar(context, ref),
             const SizedBox(height: 24),
+            if (ticket.isEscalated) _buildEscalationHistory(),
+            if (ticket.isEscalated) const SizedBox(height: 24),
             _buildTicketInfo(),
             const SizedBox(height: 24),
             _buildAssignmentSection(context, ref, isAdmin),
@@ -53,6 +103,40 @@ class TicketDetailScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _handleDeEscalation(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Resolve Escalation'),
+        content: const Text(
+            'This will mark the escalation as resolved. The ticket will remain in its current status. Continue?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Resolve'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await ref.read(ticketProvider.notifier).resolveEscalation(ticket.id);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Escalation resolved successfully')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   Widget _buildStatusBar(BuildContext context, WidgetRef ref) {
@@ -90,7 +174,8 @@ class TicketDetailScreen extends ConsumerWidget {
       'assigned',
       'in-progress',
       'resolved',
-      'closed'
+      'closed',
+      'escalated'
     ];
 
     return DropdownButton<String>(

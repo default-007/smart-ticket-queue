@@ -44,8 +44,9 @@ SLAMetrics _$SLAMetricsFromJson(Map<String, dynamic> json) => SLAMetrics(
       totalTickets: (json['totalTickets'] as num).toInt(),
       responseSLABreaches: (json['responseSLABreaches'] as num).toInt(),
       resolutionSLABreaches: (json['resolutionSLABreaches'] as num).toInt(),
-      averageResponseTime: (json['averageResponseTime'] as num).toDouble(),
-      averageResolutionTime: (json['averageResolutionTime'] as num).toDouble(),
+      averageResponseTime: (json['averageResponseTime'] as num?)?.toDouble(),
+      averageResolutionTime:
+          (json['averageResolutionTime'] as num?)?.toDouble(),
       slaComplianceRate: (json['slaComplianceRate'] as num).toDouble(),
     );
 
@@ -66,8 +67,8 @@ TicketSLA _$TicketSLAFromJson(Map<String, dynamic> json) => TicketSLA(
       resolutionDeadline: json['resolutionDeadline'] == null
           ? null
           : DateTime.parse(json['resolutionDeadline'] as String),
-      responseTimeMet: json['responseTimeMet'] as bool,
-      resolutionTimeMet: json['resolutionTimeMet'] as bool,
+      responseTimeMet: json['responseTimeMet'] as bool?,
+      resolutionTimeMet: json['resolutionTimeMet'] as bool?,
     );
 
 Map<String, dynamic> _$TicketSLAToJson(TicketSLA instance) => <String, dynamic>{

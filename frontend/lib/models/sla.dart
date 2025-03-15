@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:json_annotation/json_annotation.dart';
 
 part 'sla.g.dart';
@@ -47,62 +48,93 @@ class SLAMetrics {
   final int totalTickets;
   final int responseSLABreaches;
   final int resolutionSLABreaches;
-  final double averageResponseTime;
-  final double averageResolutionTime;
+  final double? averageResponseTime;
+  final double? averageResolutionTime;
   final double slaComplianceRate;
 
   SLAMetrics({
     required this.totalTickets,
     required this.responseSLABreaches,
     required this.resolutionSLABreaches,
-    required this.averageResponseTime,
-    required this.averageResolutionTime,
+    this.averageResponseTime,
+    this.averageResolutionTime,
     required this.slaComplianceRate,
   });
 
-  factory SLAMetrics.fromJson(Map<String, dynamic> json) =>
-      _$SLAMetricsFromJson(json);
+  factory SLAMetrics.fromJson(dynamic json) {
+    // If it's a list, take the first item
+    final data = json is List ? json.first : json;
+
+    return SLAMetrics(
+      totalTickets: data['totalTickets'] ?? 0,
+      responseSLABreaches: data['responseSLABreaches'] ?? 0,
+      resolutionSLABreaches: data['resolutionSLABreaches'] ?? 0,
+      averageResponseTime: data['averageResponseTime'],
+      averageResolutionTime: data['averageResolutionTime'],
+      slaComplianceRate: (data['slaComplianceRate'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
 
   Map<String, dynamic> toJson() => _$SLAMetricsToJson(this);
 
   String get complianceRateFormatted =>
       '${slaComplianceRate.toStringAsFixed(1)}%';
 
-  String get averageResponseTimeFormatted =>
-      '${averageResponseTime.toStringAsFixed(1)} min';
+  String get averageResponseTimeFormatted => averageResponseTime != null
+      ? '${averageResponseTime!.toStringAsFixed(1)} min'
+      : 'N/A';
 
-  String get averageResolutionTimeFormatted =>
-      '${(averageResolutionTime / 60).toStringAsFixed(1)} hrs';
+  String get averageResolutionTimeFormatted => averageResolutionTime != null
+      ? '${(averageResolutionTime! / 60).toStringAsFixed(1)} hrs'
+      : 'N/A';
 }
 
 @JsonSerializable()
 class TicketSLA {
   final DateTime? responseDeadline;
   final DateTime? resolutionDeadline;
-  final bool responseTimeMet;
-  final bool resolutionTimeMet;
+  final bool? responseTimeMet;
+  final bool? resolutionTimeMet;
 
   TicketSLA({
     this.responseDeadline,
     this.resolutionDeadline,
-    required this.responseTimeMet,
-    required this.resolutionTimeMet,
+    this.responseTimeMet,
+    this.resolutionTimeMet,
   });
 
-  factory TicketSLA.fromJson(Map<String, dynamic> json) =>
-      _$TicketSLAFromJson(json);
+  factory TicketSLA.fromJson(Map<String, dynamic> json) {
+    return TicketSLA(
+      responseDeadline: json['responseTime'] != null &&
+              json['responseTime']['deadline'] != null
+          ? DateTime.parse(json['responseTime']['deadline'] as String)
+          : null,
+      resolutionDeadline: json['resolutionTime'] != null &&
+              json['resolutionTime']['deadline'] != null
+          ? DateTime.parse(json['resolutionTime']['deadline'] as String)
+          : null,
+      responseTimeMet: json['responseTime'] != null
+          ? json['responseTime']['met'] as bool?
+          : null,
+      resolutionTimeMet: json['resolutionTime'] != null
+          ? json['resolutionTime']['met'] as bool?
+          : null,
+    );
+  }
 
   Map<String, dynamic> toJson() => _$TicketSLAToJson(this);
 
-  bool get isBreached => !responseTimeMet || !resolutionTimeMet;
+  bool get isBreached =>
+      (responseTimeMet != null && !responseTimeMet!) ||
+      (resolutionTimeMet != null && !resolutionTimeMet!);
 
   Duration? get timeUntilResponseBreach {
-    if (responseDeadline == null || responseTimeMet) return null;
+    if (responseDeadline == null || responseTimeMet == true) return null;
     return responseDeadline!.difference(DateTime.now());
   }
 
   Duration? get timeUntilResolutionBreach {
-    if (resolutionDeadline == null || resolutionTimeMet) return null;
+    if (resolutionDeadline == null || resolutionTimeMet == true) return null;
     return resolutionDeadline!.difference(DateTime.now());
   }
 
@@ -110,9 +142,9 @@ class TicketSLA {
     final responseTime = timeUntilResponseBreach;
     final resolutionTime = timeUntilResolutionBreach;
 
-    if (responseTime != null && !responseTimeMet) {
+    if (responseTime != null && responseTimeMet == false) {
       return _formatDuration(responseTime);
-    } else if (resolutionTime != null && !resolutionTimeMet) {
+    } else if (resolutionTime != null && resolutionTimeMet == false) {
       return _formatDuration(resolutionTime);
     }
     return 'N/A';

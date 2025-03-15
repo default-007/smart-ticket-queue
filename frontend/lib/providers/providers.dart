@@ -3,6 +3,7 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/ticket_service.dart';
 import '../services/agent_service.dart';
+import '../services/notification_service.dart';
 
 // API Service Provider
 final apiServiceProvider = Provider<ApiService>((ref) {
@@ -25,4 +26,10 @@ final ticketServiceProvider = Provider<TicketService>((ref) {
 final agentServiceProvider = Provider<AgentService>((ref) {
   final apiService = ref.watch(apiServiceProvider);
   return AgentService(apiService);
+});
+
+// Notification Service Provider
+final notificationServiceProvider = Provider<NotificationService>((ref) {
+  final apiService = ref.watch(apiServiceProvider);
+  return NotificationService(apiService);
 });

@@ -115,13 +115,13 @@ class SLAStatusIndicator extends ConsumerWidget {
       children: [
         _buildTimelineItem(
           'Response Time',
-          sla.responseTimeMet,
+          sla.responseTimeMet ?? false,
           sla.responseDeadline,
         ),
         const SizedBox(height: 12),
         _buildTimelineItem(
           'Resolution Time',
-          sla.resolutionTimeMet,
+          sla.resolutionTimeMet ?? false,
           sla.resolutionDeadline,
         ),
       ],

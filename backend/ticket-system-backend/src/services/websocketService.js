@@ -16,18 +16,27 @@ class WebSocketService {
 
 	setupSocketAuth() {
 		this.io.use((socket, next) => {
-			if (socket.handshake.auth && socket.handshake.auth.token) {
-				jwt.verify(
-					socket.handshake.auth.token,
-					process.env.JWT_SECRET,
-					(err, decoded) => {
-						if (err) return next(new Error("Authentication error"));
-						socket.user = decoded;
-						next();
-					}
-				);
-			} else {
-				next(new Error("Authentication error"));
+			try {
+				if (socket.handshake.auth && socket.handshake.auth.token) {
+					jwt.verify(
+						socket.handshake.auth.token,
+						process.env.JWT_SECRET,
+						(err, decoded) => {
+							if (err) {
+								console.error("Socket auth error:", err.message);
+								return next(new Error("Authentication error"));
+							}
+							socket.user = decoded;
+							next();
+						}
+					);
+				} else {
+					console.warn("Socket connection attempt without auth token");
+					next(new Error("Authentication error"));
+				}
+			} catch (error) {
+				console.error("Socket auth critical error:", error);
+				next(new Error("Internal server error"));
 			}
 		});
 	}

@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../models/ticket.dart';
+import '../../models/agent.dart';
+import '../../providers/ticket_provider.dart';
+import '../../providers/agent_provider.dart';
 import 'sla_status_indicator.dart';
 
 class TicketCard extends ConsumerStatefulWidget {
@@ -24,9 +27,81 @@ class TicketCard extends ConsumerStatefulWidget {
 class _TicketCardState extends ConsumerState<TicketCard> {
   bool _expanded = false;
 
+  Future<void> assignTicket(String ticketId) async {
+    // First, show agent selection dialog
+    final selectedAgent = await showAgentSelectionDialog(context);
+
+    if (selectedAgent != null) {
+      try {
+        // Then update the ticket with both status and agentId
+        await ref
+            .read(ticketProvider.notifier)
+            .updateTicketWithAgent(ticketId, 'assigned', selectedAgent.id);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ticket assigned to ${selectedAgent.name}')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error assigning ticket: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<Agent?> showAgentSelectionDialog(BuildContext context) async {
+    // Load available agents
+    await ref.read(agentProvider.notifier).loadAvailableAgents();
+    final agents = ref.read(agentProvider).agents;
+
+    if (!mounted) return null;
+
+    return await showDialog<Agent?>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Agent'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: agents.isEmpty
+              ? const Center(child: Text('No available agents'))
+              : ListView.builder(
+                  itemCount: agents.length,
+                  itemBuilder: (context, index) {
+                    final agent = agents[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        child: Text(agent.name.isNotEmpty
+                            ? agent.name[0].toUpperCase()
+                            : 'A'),
+                      ),
+                      title: Text(agent.name),
+                      subtitle: Text(
+                          'Load: ${agent.currentLoad}/${agent.maxTickets}'),
+                      onTap: () => Navigator.of(context).pop(agent),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
+      // Add escalation indicator
+      color: widget.ticket.isEscalated ? Colors.red.withOpacity(0.05) : null,
       child: InkWell(
         onTap: () {
           if (widget.onTap != null) {
@@ -52,12 +127,32 @@ class _TicketCardState extends ConsumerState<TicketCard> {
                         Expanded(
                           child: Text(
                             widget.ticket.title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
+                              color:
+                                  widget.ticket.isEscalated ? Colors.red : null,
                             ),
                           ),
                         ),
+                        // Add escalation badge
+                        if (widget.ticket.isEscalated)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'ESC ${widget.ticket.escalationLevel}',
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
                         const SizedBox(width: 8),
                         if (widget.ticket.sla != null)
                           SLAStatusIndicator(
@@ -110,7 +205,8 @@ class _TicketCardState extends ConsumerState<TicketCard> {
                 const SizedBox(height: 16),
                 SLAStatusIndicator(sla: widget.ticket.sla!),
               ],
-              if (widget.onStatusUpdate != null) ...[
+              if (widget.onStatusUpdate != null ||
+                  widget.ticket.status == 'queued') ...[
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -200,35 +296,48 @@ class _TicketCardState extends ConsumerState<TicketCard> {
   List<Widget> _buildActionButtons() {
     final List<Widget> buttons = [];
 
-    // Add buttons based on current status
-    switch (widget.ticket.status) {
-      case 'assigned':
-        buttons.add(
-          TextButton.icon(
-            onPressed: () => widget.onStatusUpdate?.call('in-progress'),
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Start'),
-          ),
-        );
-        break;
-      case 'in-progress':
-        buttons.add(
-          TextButton.icon(
-            onPressed: () => widget.onStatusUpdate?.call('resolved'),
-            icon: const Icon(Icons.check),
-            label: const Text('Resolve'),
-          ),
-        );
-        break;
-      case 'resolved':
-        buttons.add(
-          TextButton.icon(
-            onPressed: () => widget.onStatusUpdate?.call('closed'),
-            icon: const Icon(Icons.done_all),
-            label: const Text('Close'),
-          ),
-        );
-        break;
+    // Add assign button for unassigned, queued tickets
+    if (widget.ticket.status == 'queued' && widget.ticket.assignedTo == null) {
+      buttons.add(
+        TextButton.icon(
+          onPressed: () => assignTicket(widget.ticket.id),
+          icon: const Icon(Icons.person_add),
+          label: const Text('Assign'),
+        ),
+      );
+    }
+
+    // Add status update buttons
+    if (widget.onStatusUpdate != null) {
+      switch (widget.ticket.status) {
+        case 'assigned':
+          buttons.add(
+            TextButton.icon(
+              onPressed: () => widget.onStatusUpdate?.call('in-progress'),
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Start'),
+            ),
+          );
+          break;
+        case 'in-progress':
+          buttons.add(
+            TextButton.icon(
+              onPressed: () => widget.onStatusUpdate?.call('resolved'),
+              icon: const Icon(Icons.check),
+              label: const Text('Resolve'),
+            ),
+          );
+          break;
+        case 'resolved':
+          buttons.add(
+            TextButton.icon(
+              onPressed: () => widget.onStatusUpdate?.call('closed'),
+              icon: const Icon(Icons.done_all),
+              label: const Text('Close'),
+            ),
+          );
+          break;
+      }
     }
 
     return buttons;

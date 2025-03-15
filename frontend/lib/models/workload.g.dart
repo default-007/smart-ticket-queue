@@ -16,9 +16,6 @@ WorkloadMetrics _$WorkloadMetricsFromJson(Map<String, dynamic> json) =>
       availableAgents: (json['availableAgents'] as num).toInt(),
       workloadDistribution:
           Map<String, int>.from(json['workloadDistribution'] as Map),
-      agentWorkloads: (json['agentWorkloads'] as List<dynamic>)
-          .map((e) => AgentWorkload.fromJson(e as Map<String, dynamic>))
-          .toList(),
     );
 
 Map<String, dynamic> _$WorkloadMetricsToJson(WorkloadMetrics instance) =>
@@ -30,7 +27,6 @@ Map<String, dynamic> _$WorkloadMetricsToJson(WorkloadMetrics instance) =>
       'overloadedAgents': instance.overloadedAgents,
       'availableAgents': instance.availableAgents,
       'workloadDistribution': instance.workloadDistribution,
-      'agentWorkloads': instance.agentWorkloads,
     };
 
 AgentWorkload _$AgentWorkloadFromJson(Map<String, dynamic> json) =>

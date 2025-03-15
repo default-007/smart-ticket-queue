@@ -51,6 +51,38 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
   }
 
+  Future<void> createAgent(Map<String, dynamic> data) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      final agent = await _agentService.createAgent(data);
+      final updatedAgents = [...state.agents, agent];
+      state = state.copyWith(isLoading: false, agents: updatedAgents);
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+      throw e;
+    }
+  }
+
+  Future<void> updateAgent(String agentId, Map<String, dynamic> data) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      final updatedAgent = await _agentService.updateAgent(agentId, data);
+      final updatedAgents = state.agents
+          .map((agent) => agent.id == agentId ? updatedAgent : agent)
+          .toList();
+      state = state.copyWith(isLoading: false, agents: updatedAgents);
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+      throw e;
+    }
+  }
+
   Future<void> loadAgentByUserId(String userId) async {
     try {
       state = state.copyWith(isLoading: true, error: null);
@@ -60,10 +92,23 @@ class AgentNotifier extends StateNotifier<AgentState> {
         agents: [agent], // Store the current agent in the agents list
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      String errorMessage = e.toString();
+
+      if (errorMessage.contains("duplicate key error") ||
+          errorMessage.contains("Agent not found")) {
+        // Show a more friendly error message
+        state = state.copyWith(
+          isLoading: false,
+          agents: [],
+          error:
+              "Your agent profile needs configuration. Please contact an administrator.",
+        );
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          error: errorMessage,
+        );
+      }
     }
   }
 

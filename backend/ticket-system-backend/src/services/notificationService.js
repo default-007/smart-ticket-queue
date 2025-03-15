@@ -21,6 +21,26 @@ class NotificationService {
 		return notification;
 	}
 
+	async cleanupNotifications() {
+		// Delete read notifications older than 30 days
+		const thirtyDaysAgo = new Date();
+		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+		await Notification.deleteMany({
+			read: true,
+			createdAt: { $lt: thirtyDaysAgo },
+		});
+
+		// Mark unread notifications older than 60 days as read
+		const sixtyDaysAgo = new Date();
+		sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+		await Notification.updateMany(
+			{ read: false, createdAt: { $lt: sixtyDaysAgo } },
+			{ $set: { read: true } }
+		);
+	}
+
 	async getUnreadNotifications(userId) {
 		return await Notification.find({
 			recipient: userId,

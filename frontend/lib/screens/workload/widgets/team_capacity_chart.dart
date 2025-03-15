@@ -12,10 +12,23 @@ class TeamCapacityChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Calculate the maximum utilization across all teams
+    double maxUtilization = 0;
+    for (final team in teamCapacities) {
+      if (team.utilizationPercentage > maxUtilization) {
+        maxUtilization = team.utilizationPercentage;
+      }
+    }
+
+    // Add 20% padding to the max value and round to nearest 10
+    double dynamicMaxY = (maxUtilization * 1.2).ceil() / 10 * 10;
+    // Ensure minimum of 100
+    dynamicMaxY = dynamicMaxY < 100 ? 100 : dynamicMaxY;
+
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.spaceAround,
-        maxY: 100,
+        maxY: dynamicMaxY,
         barTouchData: BarTouchData(
           touchTooltipData: BarTouchTooltipData(
             //tooltipBgColor: Colors.black87,

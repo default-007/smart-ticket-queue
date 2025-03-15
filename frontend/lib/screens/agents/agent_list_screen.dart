@@ -1,4 +1,3 @@
-// lib/screens/agents/agent_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,34 +15,66 @@ class AgentListScreen extends ConsumerStatefulWidget {
 }
 
 class _AgentListScreenState extends ConsumerState<AgentListScreen> {
+  bool _showOnlyAvailable = false;
+
   @override
   void initState() {
     super.initState();
-    // Load agents after the frame is built
     Future.microtask(() {
-      ref.read(agentProvider.notifier).loadAgents();
+      _loadAgents();
     });
+  }
+
+  void _loadAgents() {
+    if (_showOnlyAvailable) {
+      ref.read(agentProvider.notifier).loadAvailableAgents();
+    } else {
+      ref.read(agentProvider.notifier).loadAgents();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final agentState = ref.watch(agentProvider);
 
+    final displayedAgents = _showOnlyAvailable
+        ? agentState.agents.where((a) => a.status == 'online').toList()
+        : agentState.agents;
+
     return Scaffold(
       appBar: const CustomAppBar(title: 'Agents'),
       drawer: const CustomDrawer(),
-      body: agentState.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : agentState.error != null
-              ? ErrorDisplay(
-                  message: agentState.error!,
-                  onRetry: () {
-                    Future.microtask(() {
-                      ref.read(agentProvider.notifier).loadAgents();
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                const Text('Show only available agents:'),
+                Switch(
+                  value: _showOnlyAvailable,
+                  onChanged: (value) {
+                    setState(() {
+                      _showOnlyAvailable = value;
                     });
+                    _loadAgents();
                   },
-                )
-              : _buildAgentList(agentState.agents),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: agentState.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : agentState.error != null
+                    ? ErrorDisplay(
+                        message: agentState.error!,
+                        onRetry: _loadAgents,
+                      )
+                    : _buildAgentList(agentState.agents),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           GoRouter.of(context).go('/agents/create');
@@ -72,11 +103,10 @@ class _AgentListScreenState extends ConsumerState<AgentListScreen> {
           return AgentCard(
             agent: agent,
             onTap: () {
-              Navigator.pushNamed(
-                context,
-                '/agents/detail',
-                arguments: agent,
-              );
+              context.push('/agents/detail', extra: agent);
+            },
+            onEdit: () {
+              context.push('/agents/edit/${agent.id}', extra: agent);
             },
           );
         },

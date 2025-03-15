@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:smart_ticketing/providers/ticket_provider.dart';
 
@@ -35,11 +36,18 @@ class _CreateTicketScreenState extends ConsumerState<CreateTicketScreen> {
           'estimatedHours': _estimatedHours,
           'priority': _priority,
         });
-        Navigator.pop(context);
+        // Check if context is still mounted before navigating
+        if (mounted) {
+          // Use Go Router instead of Navigator.pop
+          context.go('/tickets');
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        // Check if context is still mounted before showing snackbar
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.toString())),
+          );
+        }
       }
     }
   }
@@ -51,6 +59,10 @@ class _CreateTicketScreenState extends ConsumerState<CreateTicketScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Ticket'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop('/tickets'),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

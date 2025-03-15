@@ -1,3 +1,4 @@
+// lib/screens/dashboard/agent_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:smart_ticketing/models/agent.dart';
@@ -5,6 +6,7 @@ import 'package:smart_ticketing/models/ticket.dart';
 import 'package:smart_ticketing/providers/auth_provider.dart';
 import 'package:smart_ticketing/widgets/agents/agent_status_card.dart';
 import 'package:smart_ticketing/widgets/common/custom_drawer.dart';
+import 'package:smart_ticketing/widgets/common/error_display.dart';
 import '../../providers/ticket_provider.dart';
 import '../../providers/agent_provider.dart';
 import '../../widgets/tickets/ticket_card.dart';
@@ -23,8 +25,7 @@ class _AgentDashboardState extends ConsumerState<AgentDashboard> {
   void initState() {
     super.initState();
     Future.microtask(() {
-      ref.read(ticketProvider.notifier).loadTickets();
-      _loadAgentData();
+      _loadAgentData().then((_) => _loadTicketsForAgent());
     });
   }
 
@@ -38,10 +39,22 @@ class _AgentDashboardState extends ConsumerState<AgentDashboard> {
     }
   }
 
+  // This method loads tickets assigned to the current agent
+  Future<void> _loadTicketsForAgent() async {
+    final agentState = ref.read(agentProvider);
+    if (agentState.agents.isNotEmpty) {
+      _currentAgent = agentState.agents[0];
+
+      // Use assignedTo parameter
+      await ref.read(ticketProvider.notifier).loadTickets(
+            assignedTo: _currentAgent!.id,
+          );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ticketState = ref.watch(ticketProvider);
-    //final authState = ref.watch(authProvider);
     final agentState = ref.watch(agentProvider);
 
     // Get the current agent from the agent state
@@ -62,8 +75,7 @@ class _AgentDashboardState extends ConsumerState<AgentDashboard> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              ref.read(ticketProvider.notifier).loadTickets();
-              _loadAgentData();
+              _loadAgentData().then((_) => _loadTicketsForAgent());
             },
           ),
         ],
@@ -84,8 +96,15 @@ class _AgentDashboardState extends ConsumerState<AgentDashboard> {
           Expanded(
             child: ticketState.isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : ticketState.error != null
-                    ? Center(child: Text(ticketState.error!))
+                : ticketState.hasError
+                    ? ErrorDisplay(
+                        // Use ErrorDisplay widget for consistent error handling
+                        message: ticketState.errorMessage ??
+                            'An unknown error occurred',
+                        onRetry: () {
+                          _loadTicketsForAgent();
+                        },
+                      )
                     : _buildTicketList(ticketState.tickets),
           ),
         ],
@@ -96,8 +115,8 @@ class _AgentDashboardState extends ConsumerState<AgentDashboard> {
   Widget _buildTicketList(List<Ticket> tickets) {
     if (_currentAgent == null) return const SizedBox();
 
-    final assignedTickets =
-        tickets.where((t) => t.assignedTo?.id == _currentAgent!.id).toList();
+    // Filter tickets for the current agent (though this should now be redundant)
+    final assignedTickets = tickets;
 
     if (assignedTickets.isEmpty) {
       return const Center(

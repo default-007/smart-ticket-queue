@@ -16,6 +16,7 @@ class SLAState {
   final DateTime? startDate;
   final DateTime? endDate;
   final String? selectedDepartment;
+  final List<Map<String, dynamic>> trends;
 
   SLAState({
     this.isLoading = false,
@@ -25,6 +26,7 @@ class SLAState {
     this.startDate,
     this.endDate,
     this.selectedDepartment,
+    this.trends = const [],
   });
 
   SLAState copyWith({
@@ -35,6 +37,7 @@ class SLAState {
     DateTime? startDate,
     DateTime? endDate,
     String? selectedDepartment,
+    List<Map<String, dynamic>>? trends,
   }) {
     return SLAState(
       isLoading: isLoading ?? this.isLoading,
@@ -44,6 +47,7 @@ class SLAState {
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
       selectedDepartment: selectedDepartment ?? this.selectedDepartment,
+      trends: trends ?? this.trends,
     );
   }
 }
@@ -69,6 +73,29 @@ class SLANotifier extends StateNotifier<SLAState> {
   Future<void> updateDepartment(String? department) async {
     state = state.copyWith(selectedDepartment: department);
     await loadSLAMetrics();
+  }
+
+  Future<void> loadSLATrends({String period = 'weekly'}) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+
+      final response = await _apiService.get(
+        '/sla/trends',
+        params: {'period': period},
+      );
+
+      final trends = List<Map<String, dynamic>>.from(response.data['data']);
+
+      state = state.copyWith(
+        isLoading: false,
+        trends: trends,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+    }
   }
 
   Future<void> loadSLAMetrics() async {
@@ -104,6 +131,9 @@ class SLANotifier extends StateNotifier<SLAState> {
     try {
       state = state.copyWith(isLoading: true, error: null);
       final response = await _apiService.get('/sla/config');
+
+      print('SLA Config Response: ${response.data}'); // Debug print
+
       final configs = (response.data['data'] as List)
           .map((json) => SLAConfig.fromJson(json))
           .toList();
@@ -112,6 +142,7 @@ class SLANotifier extends StateNotifier<SLAState> {
         configs: configs,
       );
     } catch (e) {
+      print('Error loading SLA configs: $e');
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),

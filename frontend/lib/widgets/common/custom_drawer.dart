@@ -70,6 +70,16 @@ class CustomDrawer extends ConsumerWidget {
               onTap: () => context.go('/workload'),
             ),
           ],
+
+          if (user?.role == 'admin' || user?.role == 'agent') ...[
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.schedule),
+              title: const Text('Shift Management'),
+              onTap: () => context.go('/shifts'),
+            ),
+          ],
+
           // Profile for all authenticated users
           const Divider(),
           ListTile(

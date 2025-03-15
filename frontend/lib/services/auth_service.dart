@@ -32,7 +32,7 @@ class AuthResponse {
   factory AuthResponse.fromJson(Map<String, dynamic> json) {
     final user = User.fromJson(json['data']);
     final token = json['token'] as String;
-    final refreshToken = json['refreshToken'] as String;
+    final refreshToken = json['refreshToken'] as String? ?? '';
     return AuthResponse._internal(
       user: user.copyWith(token: token),
       token: token,
@@ -49,8 +49,10 @@ class AuthService {
 
   // Helper method to store auth tokens
   Future<void> _storeTokens(String token, String refreshToken) async {
+    print("Storing tokens - token: ${token.substring(0, 10)}...");
     await _storage.write(key: 'token', value: token);
     await _storage.write(key: 'refreshToken', value: refreshToken);
+    print("Tokens stored successfully");
   }
 
   Future<bool> testConnection() async {
@@ -181,9 +183,7 @@ class AuthService {
   }
 
   void _validateAuthResponse(Map<String, dynamic> data) {
-    if (data['token'] == null ||
-        data['data'] == null ||
-        data['refreshToken'] == null) {
+    if (data['token'] == null || data['data'] == null) {
       throw Exception('Invalid response format');
     }
   }

@@ -1,18 +1,29 @@
 // src/config/permissions.js
 const permissions = {
 	admin: {
-		tickets: ["create", "read", "update", "delete", "process-queue"],
+		tickets: [
+			"create",
+			"read",
+			"update",
+			"delete",
+			"process-queue",
+			"read-all",
+		],
 		agents: ["create", "read", "update", "delete"],
 		sla: ["read", "update"],
 		system: ["manage"],
 		reports: ["view", "generate"],
+		profile: ["read", "update", "change-password"],
+		notifications: ["read", "mark-read"],
+		shifts: ["view", "manage"],
+		workload: ["view", "redistribute"],
 		all: true,
 	},
 	agent: {
-		tickets: ["read", "update", "claim"],
+		tickets: ["create", "read", "update", "claim", "read-assigned"],
+		agents: ["read-self"],
 		profile: ["read", "update"],
 		notifications: ["read", "update"],
-		restricted: ["view-assigned"],
 	},
 	user: {
 		tickets: ["create", "read-own", "update-own"],

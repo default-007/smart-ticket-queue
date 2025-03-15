@@ -30,8 +30,10 @@ class Agent {
 
   factory Agent.fromJson(Map<String, dynamic> json) {
     try {
+      final agentId = json['_id']?.toString() ?? json['id']?.toString() ?? '';
+
       return Agent(
-        id: json['_id']?.toString() ?? '',
+        id: agentId,
         name: json['name']?.toString() ?? '',
         email: json['email']?.toString() ?? '',
         status: json['status']?.toString() ?? '',
@@ -48,6 +50,21 @@ class Agent {
       print('Agent parsing error: $e');
       rethrow;
     }
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'status': status,
+      'currentTicket': currentTicket,
+      'shift': shift.toJson(),
+      'maxTickets': maxTickets,
+      'currentLoad': currentLoad,
+      'skills': skills,
+      'department': department,
+    };
   }
 
   bool get isAvailable => status == 'online' && currentTicket == null;
@@ -82,5 +99,13 @@ class AgentShift {
     final now = DateTime.now();
     return AgentShift(
         start: now, end: now.add(const Duration(hours: 8)), timezone: 'UTC');
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'start': start.toIso8601String(),
+      'end': end.toIso8601String(),
+      'timezone': timezone,
+    };
   }
 }

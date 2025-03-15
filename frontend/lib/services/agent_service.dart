@@ -11,7 +11,7 @@ class AgentService {
 
   Future<List<Agent>> getAgents() async {
     try {
-      final response = await _apiService.get('/agents/available');
+      final response = await _apiService.get('/agents');
       print('Agent response data: ${response.data}'); // Debug print
 
       if (response.data == null) {
@@ -26,6 +26,49 @@ class AgentService {
       return agentsJson.map((json) => Agent.fromJson(json)).toList();
     } catch (e) {
       print('Error in getAgents: $e'); // Debug print
+      throw _handleError(e);
+    }
+  }
+
+  Future<Agent> createAgent(Map<String, dynamic> data) async {
+    try {
+      final response = await _apiService.post('/agents', data);
+
+      if (response.data == null || response.data['data'] == null) {
+        throw Exception('Invalid response format');
+      }
+
+      return Agent.fromJson(response.data['data']);
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Agent> updateAgent(String agentId, Map<String, dynamic> data) async {
+    try {
+      final response = await _apiService.put('/agents/$agentId', data);
+
+      if (response.data == null || response.data['data'] == null) {
+        throw Exception('Invalid response format');
+      }
+
+      return Agent.fromJson(response.data['data']);
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Agent> updateAgentStatus(String agentId, String status) async {
+    try {
+      final response =
+          await _apiService.put('/agents/$agentId/status', {'status': status});
+
+      if (response.data == null || response.data['data'] == null) {
+        throw Exception('Invalid response format');
+      }
+
+      return Agent.fromJson(response.data['data']);
+    } catch (e) {
       throw _handleError(e);
     }
   }
@@ -81,9 +124,14 @@ class AgentService {
     try {
       final response =
           await _apiService.post('/agents/$agentId/claim/$ticketId', {});
+
+      if (response.data == null || response.data['data'] == null) {
+        throw Exception('Invalid response format');
+      }
+
       return {
         'agent': Agent.fromJson(response.data['data']['agent']),
-        'ticket': Ticket.fromJson(response.data['data']['ticket'])
+        'ticket': response.data['data']['ticket']
       };
     } catch (e) {
       throw _handleError(e);

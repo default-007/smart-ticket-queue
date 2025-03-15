@@ -71,7 +71,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // Handle navigation when route is set
     if (navigationState.route != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        GoRouter.of(context).go('/tickets');
+        GoRouter.of(context).go(navigationState.route!);
         ref.read(navigationProvider.notifier).resetNavigation();
       });
     }

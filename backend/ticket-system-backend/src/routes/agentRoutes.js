@@ -7,14 +7,16 @@ const {
 	claimTicket,
 	updateShift,
 	getAgentByUserId,
+	getAgentList,
 } = require("../controllers/agentController");
 const auth = require("../middleware/auth");
 const authorize = require("../middleware/authorize");
-const { checkPermission } = require("../middleware/auth");
+//const { checkPermission } = require("../middleware/auth");
 
 router.use(auth);
 
 // Only admins and agents can access agent routes
+router.get("/", authorize(["admin", "agent"]), getAgentList);
 router.get("/user/:userId", authorize(["admin", "agent"]), getAgentByUserId);
 router.get("/available", authorize(["admin", "agent"]), getAvailableAgents);
 router.put("/:id/status", authorize(["admin", "agent"]), updateStatus);

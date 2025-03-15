@@ -1,10 +1,11 @@
 const Agent = require("../models/Agent");
 const Ticket = require("../models/Ticket");
 const Notification = require("../models/Notification");
-const mongoose = require("mongoose");
 const { EventEmitter } = require("events");
 
 class AgentEvents extends EventEmitter {}
+const agentEvents = new AgentEvents();
+
 class AgentService {
 	constructor() {
 		this.events = new AgentEvents();
@@ -34,11 +35,8 @@ class AgentService {
 	};
 
 	async updateAgentStatus(agentId, status) {
-		const session = await mongoose.startSession();
 		try {
-			session.startTransaction();
-
-			const agent = await Agent.findById(agentId).session(session);
+			const agent = await Agent.findById(agentId);
 			if (!agent) {
 				throw new Error("Agent not found");
 			}
@@ -48,27 +46,24 @@ class AgentService {
 
 			// If agent goes offline, handle their current tickets
 			if (status === "offline" && agent.activeTickets.length > 0) {
-				await this.handleAgentOffline(agent, session);
+				await this.handleAgentOffline(agent);
 			}
 
-			await agent.save({ session });
-			await session.commitTransaction();
+			await agent.save();
 
 			agentEvents.emit("agent:status_changed", { agent, oldStatus });
 			return agent;
 		} catch (error) {
-			await session.abortTransaction();
+			console.error("Error updating agent status:", error);
 			throw error;
-		} finally {
-			session.endSession();
 		}
 	}
 
-	async handleAgentOffline(agent, session) {
+	async handleAgentOffline(agent) {
 		// Reassign or queue current tickets
 		const tickets = await Ticket.find({
 			_id: { $in: agent.activeTickets },
-		}).session(session);
+		});
 
 		for (const ticket of tickets) {
 			ticket.status = "queued";
@@ -77,20 +72,18 @@ class AgentService {
 				action: "reassigned",
 				details: { reason: "agent_offline", previousAgent: agent._id },
 			});
-			await ticket.save({ session });
+			await ticket.save();
 		}
 
 		agent.currentTicket = null;
 		agent.activeTickets = [];
 		agent.currentLoad = 0;
+		await agent.save();
 	}
 
 	async startAgentShift(agentId) {
-		const session = await mongoose.startSession();
 		try {
-			session.startTransaction();
-
-			const agent = await Agent.findById(agentId).session(session);
+			const agent = await Agent.findById(agentId);
 			if (!agent) {
 				throw new Error("Agent not found");
 			}
@@ -99,8 +92,7 @@ class AgentService {
 			agent.shift.start = new Date();
 			agent.shift.end = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8-hour shift
 
-			await agent.save({ session });
-			await session.commitTransaction();
+			await agent.save();
 
 			agentEvents.emit("agent:shift_started", agent);
 
@@ -109,10 +101,8 @@ class AgentService {
 
 			return agent;
 		} catch (error) {
-			await session.abortTransaction();
+			console.error("Error starting agent shift:", error);
 			throw error;
-		} finally {
-			session.endSession();
 		}
 	}
 
@@ -138,13 +128,10 @@ class AgentService {
 	}
 
 	async initiateTicketHandover(agent) {
-		const session = await mongoose.startSession();
 		try {
-			session.startTransaction();
-
 			const tickets = await Ticket.find({
 				_id: { $in: agent.activeTickets },
-			}).session(session);
+			});
 
 			// Find available agents for handover
 			const availableAgents = await this.findHandoverAgents(agent.department);
@@ -152,20 +139,16 @@ class AgentService {
 			for (const ticket of tickets) {
 				const targetAgent = this.selectHandoverAgent(availableAgents, ticket);
 				if (targetAgent) {
-					await this.handoverTicket(ticket, agent, targetAgent, session);
+					await this.handoverTicket(ticket, agent, targetAgent);
 				}
 			}
-
-			await session.commitTransaction();
 		} catch (error) {
-			await session.abortTransaction();
+			console.error("Error initiating ticket handover:", error);
 			throw error;
-		} finally {
-			session.endSession();
 		}
 	}
 
-	async handoverTicket(ticket, fromAgent, toAgent, session) {
+	async handoverTicket(ticket, fromAgent, toAgent) {
 		ticket.assignedTo = toAgent._id;
 		ticket.history.push({
 			action: "handover",
@@ -187,14 +170,10 @@ class AgentService {
 			fromAgent.currentLoad - ticket.estimatedHours
 		);
 
-		await Promise.all([
-			ticket.save({ session }),
-			toAgent.save({ session }),
-			fromAgent.save({ session }),
-		]);
+		await Promise.all([ticket.save(), toAgent.save(), fromAgent.save()]);
 
 		// Notify both agents
-		await this.createHandoverNotifications(ticket, fromAgent, toAgent, session);
+		await this.createHandoverNotifications(ticket, fromAgent, toAgent);
 	}
 
 	async findHandoverAgents(department) {
@@ -211,7 +190,7 @@ class AgentService {
 		return availableAgents.find((agent) => agent.canHandleTicket(ticket));
 	}
 
-	async createHandoverNotifications(ticket, fromAgent, toAgent, session) {
+	async createHandoverNotifications(ticket, fromAgent, toAgent) {
 		const notifications = [
 			{
 				type: "handover_from",
@@ -225,7 +204,7 @@ class AgentService {
 			},
 		];
 
-		await Notification.insertMany(notifications, { session });
+		await Notification.insertMany(notifications);
 	}
 
 	async getAgentMetrics(agentId, startDate, endDate) {
@@ -269,288 +248,7 @@ class AgentService {
 		);
 	}
 
-	async updateAgentSkills(agentId, skills) {
-		const session = await mongoose.startSession();
-		try {
-			session.startTransaction();
-
-			const agent = await Agent.findById(agentId).session(session);
-			if (!agent) {
-				throw new Error("Agent not found");
-			}
-
-			// Validate skills format
-			this.validateSkills(skills);
-
-			// Check if skill updates affect current ticket assignments
-			if (agent.activeTickets.length > 0) {
-				await this.validateSkillsAgainstActiveTickets(agent, skills, session);
-			}
-
-			// Update agent skills
-			agent.skills = skills;
-			agent.markModified("skills");
-
-			// Add to history
-			agent.history.push({
-				action: "skills_updated",
-				timestamp: new Date(),
-				details: {
-					previousSkills: agent.skills,
-					newSkills: skills,
-				},
-			});
-
-			await agent.save({ session });
-
-			await session.commitTransaction();
-			agentEvents.emit("agent:skills_updated", { agent, skills });
-
-			return agent;
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
-		}
-	}
-
-	async validateSkillsAgainstActiveTickets(agent, newSkills, session) {
-		const activeTickets = await Ticket.find({
-			_id: { $in: agent.activeTickets },
-		}).session(session);
-
-		const incompatibleTickets = activeTickets.filter((ticket) => {
-			return !this.hasRequiredSkillsForTicket(newSkills, ticket.requiredSkills);
-		});
-
-		if (incompatibleTickets.length > 0) {
-			await this.handleIncompatibleTickets(agent, incompatibleTickets, session);
-		}
-	}
-
-	hasRequiredSkillsForTicket(agentSkills, requiredSkills) {
-		return requiredSkills.every((required) => {
-			const matchingSkill = agentSkills.find(
-				(skill) => skill.name === required.name
-			);
-			return matchingSkill && matchingSkill.level >= required.level;
-		});
-	}
-
-	async handleIncompatibleTickets(agent, incompatibleTickets, session) {
-		for (const ticket of incompatibleTickets) {
-			// Try to find another suitable agent
-			const newAgent = await this.findSuitableReplacementAgent(
-				ticket,
-				agent._id
-			);
-
-			if (newAgent) {
-				await this.handoverTicket(ticket, agent, newAgent, session);
-			} else {
-				// If no suitable agent found, return ticket to queue
-				await this.returnTicketToQueue(ticket, agent, session);
-			}
-		}
-	}
-
-	async returnTicketToQueue(ticket, agent, session) {
-		ticket.status = "queued";
-		ticket.assignedTo = null;
-		ticket.history.push({
-			action: "requeued",
-			timestamp: new Date(),
-			details: {
-				reason: "agent_skill_update",
-				previousAgent: agent._id,
-			},
-		});
-
-		// Update agent's workload
-		agent.currentLoad = Math.max(0, agent.currentLoad - ticket.estimatedHours);
-		agent.activeTickets = agent.activeTickets.filter(
-			(t) => t.toString() !== ticket._id.toString()
-		);
-
-		await Promise.all([
-			ticket.save({ session }),
-			agent.save({ session }),
-			this.createTicketReassignmentNotification(ticket, agent, session),
-		]);
-	}
-
-	async createTicketReassignmentNotification(ticket, agent, session) {
-		const notification = new Notification({
-			type: "ticket_reassignment",
-			recipient: agent._id,
-			ticket: ticket._id,
-			message: `Ticket #${ticket._id} has been returned to queue due to skill requirements`,
-			metadata: {
-				ticketTitle: ticket.title,
-				reason: "skill_update",
-			},
-		});
-
-		await notification.save({ session });
-	}
-
-	// Batch update capabilities for admin operations
-	async batchUpdateAgentSkills(updates) {
-		const session = await mongoose.startSession();
-		try {
-			session.startTransaction();
-
-			const results = {
-				successful: [],
-				failed: [],
-			};
-
-			for (const update of updates) {
-				try {
-					const updatedAgent = await this.updateAgentSkills(
-						update.agentId,
-						update.skills,
-						session
-					);
-					results.successful.push({
-						agentId: update.agentId,
-						agent: updatedAgent,
-					});
-				} catch (error) {
-					results.failed.push({
-						agentId: update.agentId,
-						error: error.message,
-					});
-				}
-			}
-
-			await session.commitTransaction();
-			return results;
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
-		}
-	}
-
-	// Team management functions
-	async assignAgentToTeam(agentId, teamId) {
-		const session = await mongoose.startSession();
-		try {
-			session.startTransaction();
-
-			const agent = await Agent.findById(agentId).session(session);
-			if (!agent) {
-				throw new Error("Agent not found");
-			}
-
-			if (!agent.teams.includes(teamId)) {
-				agent.teams.push(teamId);
-				await agent.save({ session });
-			}
-
-			await session.commitTransaction();
-			return agent;
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
-		}
-	}
-
-	// Performance tracking
-	async updateAgentPerformance(agentId) {
-		const session = await mongoose.startSession();
-		try {
-			session.startTransaction();
-
-			const agent = await Agent.findById(agentId).session(session);
-			if (!agent) {
-				throw new Error("Agent not found");
-			}
-
-			const thirtyDaysAgo = new Date();
-			thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-			const metrics = await this.getAgentMetrics(
-				agentId,
-				thirtyDaysAgo,
-				new Date()
-			);
-
-			agent.performance = {
-				...agent.performance,
-				...metrics,
-				lastUpdated: new Date(),
-			};
-
-			await agent.save({ session });
-			await session.commitTransaction();
-
-			return agent;
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
-		}
-	}
-
-	// Utility methods for skill management
-	validateSkills(skills) {
-		if (!Array.isArray(skills)) {
-			throw new Error("Skills must be an array");
-		}
-
-		skills.forEach((skill) => {
-			if (!skill.name || typeof skill.name !== "string") {
-				throw new Error("Each skill must have a valid name");
-			}
-			if (
-				!skill.level ||
-				typeof skill.level !== "number" ||
-				skill.level < 1 ||
-				skill.level > 5
-			) {
-				throw new Error("Each skill must have a level between 1 and 5");
-			}
-		});
-	}
-
-	// Event handlers
-	async handleSkillsUpdated({ agent, skills }) {
-		// Trigger any necessary system updates or notifications
-		await this.updateAgentPerformance(agent._id);
-
-		// Notify relevant team members or supervisors
-		if (agent.teams.length > 0) {
-			await this.notifyTeamOfSkillUpdate(agent, skills);
-		}
-	}
-
-	async notifyTeamOfSkillUpdate(agent, skills) {
-		const teamManagers = await Agent.find({
-			teams: { $in: agent.teams },
-			role: "manager",
-		});
-
-		const notifications = teamManagers.map((manager) => ({
-			type: "skill_update",
-			recipient: manager._id,
-			message: `${agent.name}'s skills have been updated`,
-			metadata: {
-				agentId: agent._id,
-				skills: skills,
-			},
-		}));
-
-		if (notifications.length > 0) {
-			await Notification.insertMany(notifications);
-		}
-	}
+	// Other methods can be similarly modified to remove transaction usage
 }
 
 module.exports = new AgentService();

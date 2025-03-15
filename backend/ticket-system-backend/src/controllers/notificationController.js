@@ -68,3 +68,36 @@ exports.updateNotificationPreferences = asyncHandler(async (req, res) => {
 		data: preferences,
 	});
 });
+
+exports.getBatchedNotifications = asyncHandler(async (req, res) => {
+	const { userId } = req.params;
+
+	// Get unread notifications
+	const unread = await Notification.find({
+		recipient: userId,
+		read: false,
+	})
+		.sort("-createdAt")
+		.limit(10);
+
+	// Get summary counts by type
+	const typeCounts = await Notification.aggregate([
+		{ $match: { recipient: mongoose.Types.ObjectId(userId), read: false } },
+		{ $group: { _id: "$type", count: { $sum: 1 } } },
+	]);
+
+	// Convert to more readable format
+	const countsByType = typeCounts.reduce((acc, item) => {
+		acc[item._id] = item.count;
+		return acc;
+	}, {});
+
+	res.json({
+		success: true,
+		data: {
+			unread: unread,
+			total: unread.length,
+			byType: countsByType,
+		},
+	});
+});

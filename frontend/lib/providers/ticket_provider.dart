@@ -1,9 +1,364 @@
+// lib/providers/ticket_provider.dart
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:smart_ticketing/providers/providers.dart';
+import 'package:smart_ticketing/services/api_service.dart';
 import '../models/ticket.dart';
 import '../services/ticket_service.dart';
 
-// Create providers
+// Enum for loading states to handle different UI states
+enum TicketLoadingState { initial, loading, loaded, error }
+
+// Provider state class with proper error handling and loading states
+class TicketState {
+  final TicketLoadingState loadingState;
+  final List<Ticket> tickets;
+  final String? errorMessage;
+  final DateTime? lastLoaded;
+  final Map<String, dynamic>? filterParams;
+
+  const TicketState({
+    this.loadingState = TicketLoadingState.initial,
+    this.tickets = const [],
+    this.errorMessage,
+    this.lastLoaded,
+    this.filterParams,
+  });
+
+  String? get error => errorMessage;
+
+  bool get isLoading => loadingState == TicketLoadingState.loading;
+  bool get hasError => errorMessage != null;
+  bool get isInitial => loadingState == TicketLoadingState.initial;
+  bool get isLoaded => loadingState == TicketLoadingState.loaded;
+
+  TicketState copyWith({
+    TicketLoadingState? loadingState,
+    List<Ticket>? tickets,
+    String? errorMessage,
+    DateTime? lastLoaded,
+    Map<String, dynamic>? filterParams,
+    bool clearError = false,
+  }) {
+    return TicketState(
+      loadingState: loadingState ?? this.loadingState,
+      tickets: tickets ?? this.tickets,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      lastLoaded: lastLoaded ?? this.lastLoaded,
+      filterParams: filterParams ?? this.filterParams,
+    );
+  }
+
+  // Helper methods for filtering tickets
+  List<Ticket> getByStatus(String status) {
+    return tickets.where((ticket) => ticket.status == status).toList();
+  }
+
+  List<Ticket> getByPriority(int priority) {
+    return tickets.where((ticket) => ticket.priority == priority).toList();
+  }
+
+  List<Ticket> getOverdue() {
+    return tickets.where((ticket) => ticket.isOverdue).toList();
+  }
+
+  List<Ticket> getSLABreach() {
+    return tickets.where((ticket) => ticket.isSLABreached).toList();
+  }
+}
+
+class TicketNotifier extends StateNotifier<TicketState> {
+  final TicketService _ticketService;
+
+  TicketNotifier(this._ticketService) : super(const TicketState());
+
+  // Add debounce to prevent excessive API calls
+  Timer? _debounceTimer;
+
+  // Add cache timeout to invalidate cache after certain time
+  DateTime? _lastCacheTime;
+  final Duration _cacheDuration = const Duration(minutes: 1);
+
+  bool get _isCacheValid =>
+      _lastCacheTime != null &&
+      DateTime.now().difference(_lastCacheTime!) < _cacheDuration;
+
+  // Update loadTickets with debouncing and caching
+  Future<void> loadTickets({
+    String? status,
+    String? assignedTo,
+    bool forceRefresh = false,
+  }) async {
+    // Skip if already loading
+    if (state.isLoading) return;
+
+    // Check if we can use cached data
+    if (!forceRefresh && _isCacheValid && state.isLoaded) {
+      return;
+    }
+
+    // Cancel previous debounce timer
+    _debounceTimer?.cancel();
+
+    // Use debounce to prevent excessive calls
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      try {
+        state = state.copyWith(
+          loadingState: TicketLoadingState.loading,
+          clearError: true,
+          filterParams: {
+            'status': status,
+            'assignedTo': assignedTo,
+          },
+        );
+
+        final tickets = await _ticketService.getTickets(
+          status: status,
+          assignedTo: assignedTo,
+        );
+
+        state = state.copyWith(
+          loadingState: TicketLoadingState.loaded,
+          tickets: tickets,
+        );
+
+        _lastCacheTime = DateTime.now();
+      } catch (e) {
+        state = state.copyWith(
+          loadingState: TicketLoadingState.error,
+          errorMessage: e.toString(),
+        );
+      }
+    });
+  }
+
+  // Create a new ticket with proper error handling
+  Future<Ticket> createTicket(Map<String, dynamic> ticketData) async {
+    try {
+      // Set loading state
+      state = state.copyWith(
+        loadingState: TicketLoadingState.loading,
+        clearError: true,
+      );
+
+      // Call API
+      final ticket = await _ticketService.createTicket(ticketData);
+
+      // Update state with new ticket added
+      state = state.copyWith(
+        loadingState: TicketLoadingState.loaded,
+        tickets: [...state.tickets, ticket],
+      );
+
+      return ticket;
+    } catch (e) {
+      // Handle errors
+      state = state.copyWith(
+        loadingState: TicketLoadingState.error,
+        errorMessage: e.toString(),
+      );
+      rethrow;
+    }
+  }
+
+  // Update ticket status with optimistic updates for better UX
+  Future<void> updateTicketStatus(String ticketId, String status) async {
+    try {
+      // Find ticket in current state
+      final ticketIndex = state.tickets.indexWhere((t) => t.id == ticketId);
+      if (ticketIndex == -1) {
+        throw Exception('Ticket not found in state');
+      }
+
+      final ticket = state.tickets[ticketIndex];
+      final oldStatus = ticket.status;
+
+      // Create optimistically updated ticket list
+      final updatedTickets = List<Ticket>.from(state.tickets);
+
+      // Create updated ticket (this is a simplification, actual implementation
+      // would depend on how your Ticket class handles immutability)
+      final updatedTicket = Ticket(
+        id: ticket.id,
+        title: ticket.title,
+        description: ticket.description,
+        status: status, // Updated status
+        priority: ticket.priority,
+        dueDate: ticket.dueDate,
+        estimatedHours: ticket.estimatedHours,
+        assignedTo: ticket.assignedTo,
+        createdBy: ticket.createdBy,
+        createdAt: ticket.createdAt,
+        updatedAt: DateTime.now(),
+        sla: ticket.sla,
+        department: ticket.department,
+        requiredSkills: ticket.requiredSkills,
+      );
+
+      // Update list with optimistic data
+      updatedTickets[ticketIndex] = updatedTicket;
+
+      // Update state with optimistic changes
+      state = state.copyWith(
+        tickets: updatedTickets,
+        clearError: true,
+      );
+
+      // Call API
+      final resultTicket = await _ticketService.updateTicketStatus(
+        ticketId,
+        status,
+      );
+
+      // Update with actual server response
+      final finalTickets = List<Ticket>.from(state.tickets);
+      finalTickets[ticketIndex] = resultTicket;
+
+      state = state.copyWith(
+        tickets: finalTickets,
+      );
+    } catch (e) {
+      // Handle errors - could revert optimistic update here
+      state = state.copyWith(
+        errorMessage: e.toString(),
+      );
+      rethrow;
+    }
+  }
+
+  Future<Ticket> updateTicketWithAgent(
+      String ticketId, String status, String agentId) async {
+    try {
+      state = state.copyWith(
+        loadingState: TicketLoadingState.loading,
+        clearError: true,
+      );
+
+      final response =
+          await _ticketService.updateTicketWithAgent(ticketId, status, agentId);
+
+      // Update state with new ticket data
+      final updatedTickets = List<Ticket>.from(state.tickets);
+      final index = updatedTickets.indexWhere((t) => t.id == ticketId);
+      if (index >= 0) {
+        updatedTickets[index] = response;
+      }
+
+      state = state.copyWith(
+        tickets: updatedTickets,
+        loadingState: TicketLoadingState.loaded,
+      );
+
+      return response;
+    } catch (e) {
+      state = state.copyWith(
+        loadingState: TicketLoadingState.error,
+        errorMessage: e.toString(),
+      );
+      throw e;
+    }
+  }
+
+  Future<Ticket> resolveEscalation(String ticketId) async {
+    try {
+      state = state.copyWith(
+        loadingState: TicketLoadingState.loading,
+        clearError: true,
+      );
+
+      // Call the API to resolve the escalation
+      final response = await _ticketService.resolveEscalation(ticketId);
+
+      // Update state with the resolved ticket
+      final updatedTickets = List<Ticket>.from(state.tickets);
+      final index = updatedTickets.indexWhere((t) => t.id == ticketId);
+      if (index >= 0) {
+        updatedTickets[index] = response;
+      }
+
+      state = state.copyWith(
+        tickets: updatedTickets,
+        loadingState: TicketLoadingState.loaded,
+      );
+
+      return response;
+    } catch (e) {
+      state = state.copyWith(
+        loadingState: TicketLoadingState.error,
+        errorMessage: e.toString(),
+      );
+      throw e;
+    }
+  }
+
+  // Process ticket queue
+  Future<void> processQueue() async {
+    try {
+      state = state.copyWith(
+        loadingState: TicketLoadingState.loading,
+        clearError: true,
+      );
+
+      await _ticketService.processQueue();
+
+      // Reload tickets to get updated state
+      await loadTickets(forceRefresh: true);
+    } catch (e) {
+      state = state.copyWith(
+        loadingState: TicketLoadingState.error,
+        errorMessage: e.toString(),
+      );
+      rethrow;
+    }
+  }
+
+  Future<Ticket?> getTicketById(String id) async {
+    // First try to find in current state
+    try {
+      final ticket = state.tickets.firstWhere(
+        (t) => t.id == id,
+      );
+      return ticket;
+    } catch (e) {
+      // Not found in state, so try to fetch from API
+    }
+
+    // If not in state, fetch from API
+    try {
+      state = state.copyWith(
+        loadingState: TicketLoadingState.loading,
+        clearError: true,
+      );
+
+      final ticket = await _ticketService.getTicketById(id);
+
+      // Update state to include this ticket for future reference
+      if (!state.tickets.any((t) => t.id == ticket.id)) {
+        state = state.copyWith(
+          tickets: [...state.tickets, ticket],
+          loadingState: TicketLoadingState.loaded,
+        );
+      }
+
+      return ticket;
+    } catch (e) {
+      state = state.copyWith(
+        loadingState: TicketLoadingState.error,
+        errorMessage: e.toString(),
+      );
+      return null;
+    }
+  }
+
+  // Clear error state
+  void clearError() {
+    if (state.hasError) {
+      state = state.copyWith(clearError: true);
+    }
+  }
+}
+
+// Define providers
 final ticketServiceProvider = Provider<TicketService>((ref) {
   final apiService = ref.watch(apiServiceProvider);
   return TicketService(apiService);
@@ -15,96 +370,31 @@ final ticketProvider =
   return TicketNotifier(ticketService);
 });
 
-class TicketState {
-  final bool isLoading;
-  final List<Ticket> tickets;
-  final String? error;
+// Derived providers for filtered ticket lists
+final queuedTicketsProvider = Provider<List<Ticket>>((ref) {
+  final ticketState = ref.watch(ticketProvider);
+  return ticketState.getByStatus('queued');
+});
 
-  TicketState({
-    this.isLoading = false,
-    this.tickets = const [],
-    this.error,
-  });
+final assignedTicketsProvider = Provider<List<Ticket>>((ref) {
+  final ticketState = ref.watch(ticketProvider);
+  return ticketState.getByStatus('assigned');
+});
 
-  TicketState copyWith({
-    bool? isLoading,
-    List<Ticket>? tickets,
-    String? error,
-  }) {
-    return TicketState(
-      isLoading: isLoading ?? this.isLoading,
-      tickets: tickets ?? this.tickets,
-      error: error,
-    );
-  }
-}
+final inProgressTicketsProvider = Provider<List<Ticket>>((ref) {
+  final ticketState = ref.watch(ticketProvider);
+  return ticketState.getByStatus('in-progress');
+});
 
-class TicketNotifier extends StateNotifier<TicketState> {
-  final TicketService _ticketService;
+final overdueTicketsProvider = Provider<List<Ticket>>((ref) {
+  final ticketState = ref.watch(ticketProvider);
+  return ticketState.getOverdue();
+});
 
-  TicketNotifier(this._ticketService) : super(TicketState());
+final slaBreachTicketsProvider = Provider<List<Ticket>>((ref) {
+  final ticketState = ref.watch(ticketProvider);
+  return ticketState.getSLABreach();
+});
 
-  Future<void> loadTickets({String? status}) async {
-    // Prevent multiple simultaneous loading
-    if (state.isLoading) return;
-
-    try {
-      state = state.copyWith(isLoading: true, error: null);
-      final tickets = await _ticketService.getTickets(status: status);
-      state = state.copyWith(isLoading: false, tickets: tickets);
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
-    }
-  }
-
-  Future<void> createTicket(Map<String, dynamic> ticketData) async {
-    try {
-      state = state.copyWith(isLoading: true, error: null);
-      final ticket = await _ticketService.createTicket(ticketData);
-      state = state.copyWith(
-        isLoading: false,
-        tickets: [...state.tickets, ticket],
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
-    }
-  }
-
-  Future<void> updateTicketStatus(String ticketId, String status) async {
-    try {
-      state = state.copyWith(isLoading: true, error: null);
-      final updatedTicket = await _ticketService.updateTicketStatus(
-        ticketId,
-        status,
-      );
-      final updatedTickets = state.tickets.map((ticket) {
-        return ticket.id == ticketId ? updatedTicket : ticket;
-      }).toList();
-      state = state.copyWith(isLoading: false, tickets: updatedTickets);
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
-    }
-  }
-
-  Future<void> processQueue() async {
-    try {
-      state = state.copyWith(isLoading: true, error: null);
-      await _ticketService.processQueue();
-      await loadTickets(); // Reload tickets after processing queue
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
-    }
-  }
-}
+// Import required provider
+final apiServiceProvider = Provider<ApiService>((ref) => ApiService());

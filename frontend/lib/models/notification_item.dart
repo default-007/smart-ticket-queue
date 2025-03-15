@@ -26,8 +26,27 @@ class NotificationItem {
     this.metadata,
   });
 
-  factory NotificationItem.fromJson(Map<String, dynamic> json) =>
-      _$NotificationItemFromJson(json);
+  factory NotificationItem.fromJson(Map<String, dynamic> json) {
+    try {
+      // Handle MongoDB _id field
+      final notificationId =
+          json['_id']?.toString() ?? json['id']?.toString() ?? '';
+
+      return NotificationItem(
+        id: notificationId,
+        type: json['type'] as String,
+        message: json['message'] as String,
+        recipient: json['recipient'] as String,
+        read: json['read'] as bool,
+        ticketId: json['ticketId'] as String?, // Handle properly as nullable
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        metadata: json['metadata'] as Map<String, dynamic>?,
+      );
+    } catch (e) {
+      print('Error parsing NotificationItem: $e');
+      rethrow;
+    }
+  }
 
   Map<String, dynamic> toJson() => _$NotificationItemToJson(this);
 
@@ -70,5 +89,27 @@ class NotificationItem {
       default:
         return Colors.grey;
     }
+  }
+
+  Color getPriorityColor() {
+    if (metadata == null || !metadata!.containsKey('priority'))
+      return Colors.grey;
+
+    switch (metadata!['priority']) {
+      case 1:
+        return Colors.red;
+      case 2:
+        return Colors.orange;
+      case 3:
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  int? getMinutesRemaining() {
+    if (metadata == null || !metadata!.containsKey('minutesRemaining'))
+      return null;
+    return metadata!['minutesRemaining'] as int?;
   }
 }

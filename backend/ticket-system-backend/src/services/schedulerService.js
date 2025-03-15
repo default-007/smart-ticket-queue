@@ -44,10 +44,66 @@ class SchedulerService {
 
 	async processTicketQueue() {
 		try {
-			console.log("Processing ticket queue...");
-			await TicketService.processQueue();
+			const queuedTickets = await Ticket.find({
+				status: "queued",
+				assignedTo: null,
+			})
+				.sort({ priority: 1, createdAt: 1 })
+				.limit(100);
+
+			if (queuedTickets.length === 0) return { processed: 0 };
+
+			const ticketUpdates = [];
+			const agentUpdates = [];
+			const notifications = [];
+
+			for (const ticket of queuedTickets) {
+				// Process ticket logic...
+				// Instead of await ticket.save(), collect updates
+				ticketUpdates.push({
+					updateOne: {
+						filter: { _id: ticket._id },
+						update: { $set: { status: "assigned", assignedTo: agent._id } },
+					},
+				});
+
+				// Collect agent updates too
+				agentUpdates.push({
+					updateOne: {
+						filter: { _id: agent._id },
+						update: {
+							$inc: { currentLoad: ticket.estimatedHours },
+							$push: { activeTickets: ticket._id },
+						},
+					},
+				});
+
+				// And notifications
+				notifications.push({
+					type: "ticket_assigned",
+					recipient: agent._id,
+					ticket: ticket._id,
+					message: `New ticket assigned: ${ticket.title}`,
+				});
+			}
+
+			// Execute all updates in bulk
+			if (ticketUpdates.length > 0) {
+				await Ticket.bulkWrite(ticketUpdates);
+			}
+
+			if (agentUpdates.length > 0) {
+				await Agent.bulkWrite(agentUpdates);
+			}
+
+			if (notifications.length > 0) {
+				await Notification.insertMany(notifications);
+			}
+
+			return { processed: ticketUpdates.length };
 		} catch (error) {
-			console.error("Error processing ticket queue:", error);
+			logger.error(`Error processing queue: ${error.message}`);
+			throw error;
 		}
 	}
 
@@ -63,7 +119,7 @@ class SchedulerService {
 	async balanceWorkload() {
 		try {
 			console.log("Balancing workload...");
-			await WorkloadService.redistributeWorkload();
+			await WorkloadService.rebalanceWorkload();
 		} catch (error) {
 			console.error("Error balancing workload:", error);
 		}

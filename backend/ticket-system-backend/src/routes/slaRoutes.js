@@ -12,7 +12,8 @@ const authorize = require("../middleware/authorize");
 router.use(auth);
 
 router.get("/metrics", authorize("admin", "supervisor"), getSLAMetrics);
-router.get("/config/:priority/:category", getSLAConfig);
+router.get("/config", getSLAConfig);
+//router.get("/config/:priority/:category", getSLAConfig);
 router.put("/config/:priority/:category", authorize("admin"), updateSLAConfig);
 router.get("/check/:ticketId", checkTicketSLA);
 

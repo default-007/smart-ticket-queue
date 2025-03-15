@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:smart_ticketing/widgets/common/custom_drawer.dart';
 import '../../providers/workload_provider.dart';
 import '../../widgets/common/custom_app_bar.dart';
 import 'widgets/workload_overview_card.dart';
@@ -50,6 +51,7 @@ class _WorkloadDashboardScreenState
           ),
         ],
       ),
+      drawer: const CustomDrawer(),
       body: workloadState.isLoading
           ? const Center(child: CircularProgressIndicator())
           : workloadState.error != null
@@ -71,6 +73,11 @@ class _WorkloadDashboardScreenState
                             WorkloadOverviewCard(
                               metrics: workloadState.metrics!,
                             ),
+
+                          // Add the prediction card
+                          if (workloadState.predictions != null)
+                            _buildPredictionCard(workloadState.predictions),
+
                           const SizedBox(height: 16),
                           _buildSection(
                             'Agent Workloads',
@@ -78,26 +85,30 @@ class _WorkloadDashboardScreenState
                               workloads: workloadState.agentWorkloads,
                             ),
                           ),
-                          const SizedBox(height: 24),
-                          _buildSection(
-                            'Team Capacity',
-                            AspectRatio(
-                              aspectRatio: 16 / 9,
-                              child: TeamCapacityChart(
-                                teamCapacities: workloadState.teamCapacities,
+                          if (workloadState.teamCapacities.isNotEmpty) ...[
+                            const SizedBox(height: 24),
+                            _buildSection(
+                              'Team Capacity',
+                              AspectRatio(
+                                aspectRatio: 16 / 9,
+                                child: TeamCapacityChart(
+                                  teamCapacities: workloadState.teamCapacities,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                          _buildSection(
-                            'Workload Distribution',
-                            AspectRatio(
-                              aspectRatio: 16 / 9,
-                              child: WorkloadDistributionChart(
-                                metrics: workloadState.metrics!,
+                          ],
+                          if (workloadState.metrics != null) ...[
+                            const SizedBox(height: 24),
+                            _buildSection(
+                              'Workload Distribution',
+                              AspectRatio(
+                                aspectRatio: 16 / 9,
+                                child: WorkloadDistributionChart(
+                                  metrics: workloadState.metrics!,
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -109,6 +120,84 @@ class _WorkloadDashboardScreenState
         },
         icon: const Icon(Icons.auto_fix_high),
         label: const Text('Optimize'),
+      ),
+    );
+  }
+
+  Widget _buildPredictionCard(Map<String, dynamic>? predictions) {
+    if (predictions == null) return const SizedBox.shrink();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Workload Prediction',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+
+            // Daily Average
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Daily Ticket Average:'),
+                Text(
+                  '${predictions['nextWeekLoad']['dailyAverage'].toStringAsFixed(1)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            // Weekly Prediction
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Next Week Prediction:'),
+                Text(
+                  '${predictions['nextWeekLoad']['predictedTotal']} tickets',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Additional Agent Needs
+            if (predictions['agentCapacityNeeds'] != null) ...[
+              const Text('Additional Resources Needed:'),
+              const SizedBox(height: 8),
+              ...predictions['agentCapacityNeeds']
+                  .entries
+                  .map(
+                    (entry) => Padding(
+                      padding: const EdgeInsets.only(left: 16, bottom: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('${entry.key} Department:'),
+                          Text(
+                            '${entry.value['additionalAgentsNeeded']} agents',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: entry.value['additionalAgentsNeeded'] > 0
+                                  ? Colors.orange
+                                  : Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ],
+          ],
+        ),
       ),
     );
   }

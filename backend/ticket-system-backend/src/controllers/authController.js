@@ -1,4 +1,5 @@
 const asyncHandler = require("../utils/asyncHandler");
+const Agent = require("../models/Agent");
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 
@@ -17,6 +18,26 @@ exports.register = asyncHandler(async (req, res) => {
 		password,
 		role: role || "user",
 	});
+
+	if (role === "agent") {
+		await Agent.create({
+			name,
+			email,
+			status: "offline",
+			user: user._id,
+			department: "Support", // Default department
+			skills: [],
+			maxTickets: 5,
+			currentLoad: 0,
+			currentTicket: null,
+			activeTickets: [],
+			shift: {
+				start: new Date(),
+				end: new Date(new Date().getTime() + 8 * 60 * 60 * 1000),
+				timezone: "UTC",
+			},
+		});
+	}
 
 	// Generate token
 	const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {

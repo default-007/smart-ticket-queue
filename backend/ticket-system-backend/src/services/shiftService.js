@@ -4,11 +4,8 @@ const mongoose = require("mongoose");
 
 class ShiftService {
 	async startShift(agentId) {
-		const session = await mongoose.startSession();
 		try {
-			session.startTransaction();
-
-			const agent = await Agent.findById(agentId).session(session);
+			const agent = await Agent.findById(agentId);
 			if (!agent) {
 				throw new Error("Agent not found");
 			}
@@ -17,7 +14,7 @@ class ShiftService {
 			const existingActiveShift = await Shift.findOne({
 				agent: agentId,
 				status: "in-progress",
-			}).session(session);
+			});
 
 			if (existingActiveShift) {
 				throw new Error("An active shift is already in progress");
@@ -30,31 +27,21 @@ class ShiftService {
 				status: "in-progress",
 			});
 
-			await shift.save({ session });
+			await shift.save();
 
 			// Update agent status
 			agent.status = "online";
-			await agent.save({ session });
+			await agent.save();
 
-			await session.commitTransaction();
 			return shift;
 		} catch (error) {
-			await session.abortTransaction();
 			throw error;
-		} finally {
-			session.endSession();
 		}
 	}
 
 	async endShift(shiftId) {
-		const session = await mongoose.startSession();
 		try {
-			session.startTransaction();
-
-			const shift = await Shift.findById(shiftId)
-				.populate("agent")
-				.session(session);
-
+			const shift = await Shift.findById(shiftId).populate("agent");
 			if (!shift) {
 				throw new Error("Shift not found");
 			}
@@ -70,29 +57,22 @@ class ShiftService {
 			shift.status = "completed";
 			shift.end = new Date();
 
-			await shift.save({ session });
+			await shift.save();
 
 			// Update agent status
 			const agent = shift.agent;
 			agent.status = "offline";
-			await agent.save({ session });
+			await agent.save();
 
-			await session.commitTransaction();
 			return shift;
 		} catch (error) {
-			await session.abortTransaction();
 			throw error;
-		} finally {
-			session.endSession();
 		}
 	}
 
 	async scheduleBreak(shiftId, breakData) {
-		const session = await mongoose.startSession();
 		try {
-			session.startTransaction();
-
-			const shift = await Shift.findById(shiftId).session(session);
+			const shift = await Shift.findById(shiftId);
 			if (!shift) {
 				throw new Error("Shift not found");
 			}
@@ -116,23 +96,17 @@ class ShiftService {
 				status: "scheduled",
 			});
 
-			await shift.save({ session });
-			await session.commitTransaction();
+			await shift.save();
+
 			return shift;
 		} catch (error) {
-			await session.abortTransaction();
 			throw error;
-		} finally {
-			session.endSession();
 		}
 	}
 
 	async startBreak(shiftId, breakId) {
-		const session = await mongoose.startSession();
 		try {
-			session.startTransaction();
-
-			const shift = await Shift.findById(shiftId).session(session);
+			const shift = await Shift.findById(shiftId);
 			if (!shift) {
 				throw new Error("Shift not found");
 			}
@@ -149,23 +123,17 @@ class ShiftService {
 			breakItem.status = "in-progress";
 			breakItem.start = new Date();
 
-			await shift.save({ session });
-			await session.commitTransaction();
+			await shift.save();
+
 			return shift;
 		} catch (error) {
-			await session.abortTransaction();
 			throw error;
-		} finally {
-			session.endSession();
 		}
 	}
 
 	async endBreak(shiftId, breakId) {
-		const session = await mongoose.startSession();
 		try {
-			session.startTransaction();
-
-			const shift = await Shift.findById(shiftId).session(session);
+			const shift = await Shift.findById(shiftId);
 			if (!shift) {
 				throw new Error("Shift not found");
 			}
@@ -182,14 +150,11 @@ class ShiftService {
 			breakItem.status = "completed";
 			breakItem.end = new Date();
 
-			await shift.save({ session });
-			await session.commitTransaction();
+			await shift.save();
+
 			return shift;
 		} catch (error) {
-			await session.abortTransaction();
 			throw error;
-		} finally {
-			session.endSession();
 		}
 	}
 

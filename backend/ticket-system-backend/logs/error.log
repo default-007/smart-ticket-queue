@@ -1,0 +1,35 @@
+2025-03-14 20:54:56:5456 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:39:00:390 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-14 21:54:00:540 [31merror[39m: [31mError creating escalation notification: Notification validation failed: recipient: Path `recipient` is required.[39m
+2025-03-15 14:22:24:2224 [31merror[39m: [31mReferenceError: Agent is not defined[39m
+[31mReferenceError: Agent is not defined[39m
+[31m    at /home/default/Desktop/Projects/smart-ticket-queue/backend/ticket-system-backend/src/controllers/ticketController.js:105:17[39m
+[31m    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)[39m

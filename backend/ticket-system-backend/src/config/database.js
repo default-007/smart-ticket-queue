@@ -16,12 +16,15 @@ class Database {
 			const conn = await mongoose.connect(process.env.MONGODB_URI, {
 				useNewUrlParser: true,
 				useUnifiedTopology: true,
+				// Disable transactions for standalone instances
+				retryWrites: false,
+				w: 1,
 			});
 
 			this.isConnected = true;
 			console.log(`MongoDB Connected: ${conn.connection.host}`);
 		} catch (error) {
-			console.error(`Error: ${error.message}`);
+			console.error(`Error connecting to database: ${error.message}`);
 			process.exit(1);
 		}
 	}

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:smart_ticketing/widgets/common/custom_app_bar.dart';
 import 'package:smart_ticketing/widgets/common/custom_drawer.dart';
 import 'package:smart_ticketing/widgets/common/error_display.dart';
@@ -22,21 +23,25 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
   @override
   void initState() {
     super.initState();
-    // Only load tickets if not already loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Initial load without filters
+      ref.read(ticketProvider.notifier).loadTickets();
+      ref.read(ticketsLoadedProvider.notifier).state = true;
+    });
+    /* WidgetsBinding.instance.addPostFrameCallback((_) {
       final isLoaded = ref.read(ticketsLoadedProvider);
       if (!isLoaded) {
         ref.read(ticketProvider.notifier).loadTickets();
         ref.read(ticketsLoadedProvider.notifier).state = true;
       }
-    });
+    }); */
   }
 
   @override
   Widget build(BuildContext context) {
     final ticketState = ref.watch(ticketProvider);
     print(
-        'Ticket state: ${ticketState.tickets.length} tickets, error: ${ticketState.error}');
+        'Ticket state: ${ticketState.tickets.length} tickets, error: ${ticketState.errorMessage}');
 
     return Scaffold(
       appBar: const CustomAppBar(title: 'Tickets'),
@@ -49,18 +54,18 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
               setState(() {
                 _selectedStatus = status;
               });
-              // Use Future.microtask to avoid build-time state modifications
-              Future.microtask(() {
-                ref.read(ticketProvider.notifier).loadTickets(status: status);
-              });
+              // Force reload with the new filter
+              ref.read(ticketsLoadedProvider.notifier).state = false;
+              ref.read(ticketProvider.notifier).loadTickets(status: status);
             },
           ),
           Expanded(
             child: ticketState.isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : ticketState.error != null
+                : ticketState.hasError
                     ? ErrorDisplay(
-                        message: ticketState.error!,
+                        message: ticketState.errorMessage ??
+                            'An unknown error occurred',
                         onRetry: () {
                           Future.microtask(() {
                             ref
@@ -75,7 +80,7 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Navigator.pushNamed(context, '/tickets/create');
+          GoRouter.of(context).push('/tickets/create');
         },
         child: const Icon(Icons.add),
       ),
@@ -106,11 +111,7 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
           return TicketCard(
             ticket: ticket,
             onTap: () {
-              Navigator.pushNamed(
-                context,
-                '/tickets/detail',
-                arguments: ticket,
-              );
+              GoRouter.of(context).push('/tickets/detail', extra: ticket);
             },
           );
         },

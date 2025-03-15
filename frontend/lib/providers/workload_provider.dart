@@ -1,8 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:smart_ticketing/providers/providers.dart';
-
+import 'package:smart_ticketing/providers/ticket_provider.dart';
 import '../models/workload.dart';
 import '../services/workload_service.dart';
 
@@ -41,6 +40,7 @@ class WorkloadState {
     List<TeamCapacity>? teamCapacities,
     Map<String, dynamic>? predictions,
     String? error,
+    bool clearError = false,
   }) {
     return WorkloadState(
       isLoading: isLoading ?? this.isLoading,
@@ -48,7 +48,7 @@ class WorkloadState {
       agentWorkloads: agentWorkloads ?? this.agentWorkloads,
       teamCapacities: teamCapacities ?? this.teamCapacities,
       predictions: predictions ?? this.predictions,
-      error: error,
+      error: clearError ? null : (error ?? this.error),
     );
   }
 }
@@ -72,22 +72,48 @@ class WorkloadNotifier extends StateNotifier<WorkloadState> {
 
   Future<void> refreshWorkloadData() async {
     try {
-      state = state.copyWith(isLoading: true, error: null);
+      state = state.copyWith(
+        isLoading: true,
+        clearError: true,
+      );
 
-      // Fetch all workload data in parallel
-      final results = await Future.wait([
-        _workloadService.getWorkloadMetrics(),
-        _workloadService.getAgentWorkloads(),
-        _workloadService.getTeamCapacities(),
-        _workloadService.getWorkloadPredictions(),
-      ]);
+      // Fetch metrics, agent workloads, and predictions independently
+      // If any of these requests fail, we'll still have data from the others
+      WorkloadMetrics? newMetrics;
+      List<AgentWorkload> newAgentWorkloads = [];
+      List<TeamCapacity> newTeamCapacities = [];
+      Map<String, dynamic>? newPredictions;
+
+      try {
+        newMetrics = await _workloadService.getWorkloadMetrics();
+      } catch (e) {
+        print('Error fetching workload metrics: $e');
+      }
+
+      try {
+        newAgentWorkloads = await _workloadService.getAgentWorkloads();
+      } catch (e) {
+        print('Error fetching agent workloads: $e');
+      }
+
+      try {
+        newTeamCapacities = await _workloadService.getTeamCapacities();
+      } catch (e) {
+        print('Error fetching team capacities: $e');
+      }
+
+      try {
+        newPredictions = await _workloadService.getWorkloadPredictions();
+      } catch (e) {
+        print('Error fetching workload predictions: $e');
+      }
 
       state = state.copyWith(
         isLoading: false,
-        metrics: results[0] as WorkloadMetrics,
-        agentWorkloads: results[1] as List<AgentWorkload>,
-        teamCapacities: results[2] as List<TeamCapacity>,
-        predictions: results[3] as Map<String, dynamic>,
+        metrics: newMetrics,
+        agentWorkloads: newAgentWorkloads,
+        teamCapacities: newTeamCapacities,
+        predictions: newPredictions,
       );
     } catch (e) {
       state = state.copyWith(
@@ -99,7 +125,11 @@ class WorkloadNotifier extends StateNotifier<WorkloadState> {
 
   Future<void> rebalanceWorkload() async {
     try {
-      state = state.copyWith(isLoading: true, error: null);
+      state = state.copyWith(
+        isLoading: true,
+        clearError: true,
+      );
+
       await _workloadService.rebalanceWorkload();
       await refreshWorkloadData();
     } catch (e) {
@@ -112,7 +142,11 @@ class WorkloadNotifier extends StateNotifier<WorkloadState> {
 
   Future<void> optimizeAssignments() async {
     try {
-      state = state.copyWith(isLoading: true, error: null);
+      state = state.copyWith(
+        isLoading: true,
+        clearError: true,
+      );
+
       await _workloadService.optimizeAssignments();
       await refreshWorkloadData();
     } catch (e) {
