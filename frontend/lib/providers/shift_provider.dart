@@ -1,89 +1,67 @@
 // lib/providers/shift_provider.dart
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:smart_ticketing/providers/providers.dart';
 import '../models/shift.dart';
+import '../services/shift_service.dart';
 import '../services/api_service.dart';
+import '../utils/logger.dart';
 
-final shiftProvider = StateNotifierProvider<ShiftNotifier, ShiftState>((ref) {
-  final apiService = ref.watch(apiServiceProvider);
-  return ShiftNotifier(apiService);
+// Initialize the shift service provider
+final shiftServiceProvider = Provider<ShiftService>((ref) {
+  final apiService = ApiService();
+  return ShiftService(apiService);
 });
 
+// State class for the shift provider
 class ShiftState {
   final bool isLoading;
+  final String? error;
   final List<Shift> shifts;
   final Shift? currentShift;
-  final ShiftSchedule? schedule;
-  final String? error;
 
   ShiftState({
     this.isLoading = false,
+    this.error,
     this.shifts = const [],
     this.currentShift,
-    this.schedule,
-    this.error,
   });
 
   ShiftState copyWith({
     bool? isLoading,
+    String? error,
     List<Shift>? shifts,
     Shift? currentShift,
-    ShiftSchedule? schedule,
-    String? error,
+    bool clearError = false,
   }) {
     return ShiftState(
       isLoading: isLoading ?? this.isLoading,
+      error: clearError ? null : error ?? this.error,
       shifts: shifts ?? this.shifts,
       currentShift: currentShift ?? this.currentShift,
-      schedule: schedule ?? this.schedule,
-      error: error,
     );
   }
 }
 
+// Shift provider notifier
 class ShiftNotifier extends StateNotifier<ShiftState> {
-  final ApiService _apiService;
-  Timer? _shiftTimer;
+  final ShiftService _shiftService;
+  final logger = Logger();
 
-  ShiftNotifier(this._apiService) : super(ShiftState()) {
-    _startShiftMonitoring();
-  }
+  ShiftNotifier(this._shiftService) : super(ShiftState());
 
-  void _startShiftMonitoring() {
-    _shiftTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      _checkShiftStatus();
-    });
-  }
-
-  void _checkShiftStatus() {
-    final currentShift = state.currentShift;
-    if (currentShift != null) {
-      if (currentShift.needsHandover) {
-        _initiateHandover();
-      }
-
-      final currentBreak = currentShift.currentBreak;
-      if (currentBreak != null) {
-        _handleBreakStatus(currentBreak);
-      }
-    }
-  }
-
+  // Load shifts for an agent
   Future<void> loadAgentShifts(String agentId) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
     try {
-      state = state.copyWith(isLoading: true, error: null);
+      final shifts = await _shiftService.getAgentShifts(agentId);
 
-      final response = await _apiService.get('/shifts/agent/$agentId');
-      final shifts = (response.data['data'] as List)
-          .map((json) => Shift.fromJson(json))
-          .toList();
-
+      // Also try to get current shift
       Shift? currentShift;
       try {
-        currentShift = shifts.firstWhere((shift) => shift.isInProgress);
-      } catch (_) {
+        currentShift = await _shiftService.getCurrentShift(agentId);
+      } catch (e) {
+        // It's okay if there's no current shift
+        logger.info('No current shift found: ${e.toString()}');
         currentShift = null;
       }
 
@@ -93,6 +71,7 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
         currentShift: currentShift,
       );
     } catch (e) {
+      logger.error('Error loading agent shifts: ${e.toString()}');
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),
@@ -100,24 +79,23 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     }
   }
 
+  // Start a new shift
   Future<void> startShift(String agentId) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
     try {
-      state = state.copyWith(isLoading: true, error: null);
+      final shift = await _shiftService.startShift(agentId);
 
-      final response = await _apiService.post(
-        '/shifts/start',
-        {'agentId': agentId},
-      );
-
-      final shift = Shift.fromJson(response.data['data']);
-
+      // Update the current shift and the list of shifts
       final updatedShifts = [...state.shifts, shift];
+
       state = state.copyWith(
         isLoading: false,
-        shifts: updatedShifts,
         currentShift: shift,
+        shifts: updatedShifts,
       );
     } catch (e) {
+      logger.error('Error starting shift: ${e.toString()}');
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),
@@ -125,24 +103,28 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     }
   }
 
+  // End a shift
   Future<void> endShift(String shiftId) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
     try {
-      state = state.copyWith(isLoading: true, error: null);
+      final endedShift = await _shiftService.endShift(shiftId);
 
-      await _apiService.post('/shifts/$shiftId/end', {});
-
-      final updatedShifts = state.shifts
-          .map((s) => s.id == shiftId
-              ? Shift.fromJson({...s.toJson(), 'isActive': false})
-              : s)
-          .toList();
+      // Update shifts list
+      final updatedShifts = state.shifts.map((shift) {
+        if (shift.id == shiftId) {
+          return endedShift;
+        }
+        return shift;
+      }).toList();
 
       state = state.copyWith(
         isLoading: false,
         shifts: updatedShifts,
-        currentShift: null,
+        currentShift: null, // Clear current shift
       );
     } catch (e) {
+      logger.error('Error ending shift: ${e.toString()}');
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),
@@ -150,18 +132,35 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     }
   }
 
+  // Schedule a break
   Future<void> scheduleBreak(String shiftId, Break breakData) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+
     try {
-      state = state.copyWith(isLoading: true, error: null);
+      final updatedShift =
+          await _shiftService.scheduleBreak(shiftId, breakData);
 
-      final response = await _apiService.post(
-        '/shifts/$shiftId/breaks',
-        breakData.toJson(),
+      // Update current shift if it matches
+      Shift? newCurrentShift;
+      if (state.currentShift?.id == shiftId) {
+        newCurrentShift = updatedShift;
+      }
+
+      // Update shifts list
+      final updatedShifts = state.shifts.map((shift) {
+        if (shift.id == shiftId) {
+          return updatedShift;
+        }
+        return shift;
+      }).toList();
+
+      state = state.copyWith(
+        isLoading: false,
+        shifts: updatedShifts,
+        currentShift: newCurrentShift ?? state.currentShift,
       );
-
-      final updatedShift = Shift.fromJson(response.data['data']);
-      _updateShift(updatedShift);
     } catch (e) {
+      logger.error('Error scheduling break: ${e.toString()}');
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),
@@ -169,57 +168,113 @@ class ShiftNotifier extends StateNotifier<ShiftState> {
     }
   }
 
+  // Start a break
   Future<void> startBreak(String shiftId, String breakId) async {
-    try {
-      final response = await _apiService.post(
-        '/shifts/$shiftId/breaks/$breakId/start',
-        {},
-      );
+    state = state.copyWith(isLoading: true, clearError: true);
 
-      final updatedShift = Shift.fromJson(response.data['data']);
-      _updateShift(updatedShift);
+    try {
+      final updatedShift = await _shiftService.startBreak(shiftId, breakId);
+
+      // Update current shift if it matches
+      Shift? newCurrentShift;
+      if (state.currentShift?.id == shiftId) {
+        newCurrentShift = updatedShift;
+      }
+
+      // Update shifts list
+      final updatedShifts = state.shifts.map((shift) {
+        if (shift.id == shiftId) {
+          return updatedShift;
+        }
+        return shift;
+      }).toList();
+
+      state = state.copyWith(
+        isLoading: false,
+        shifts: updatedShifts,
+        currentShift: newCurrentShift ?? state.currentShift,
+      );
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      logger.error('Error starting break: ${e.toString()}');
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
     }
   }
 
+  // End a break
   Future<void> endBreak(String shiftId, String breakId) async {
-    try {
-      final response = await _apiService.post(
-        '/shifts/$shiftId/breaks/$breakId/end',
-        {},
-      );
+    state = state.copyWith(isLoading: true, clearError: true);
 
-      final updatedShift = Shift.fromJson(response.data['data']);
-      _updateShift(updatedShift);
+    try {
+      final updatedShift = await _shiftService.endBreak(shiftId, breakId);
+
+      // Update current shift if it matches
+      Shift? newCurrentShift;
+      if (state.currentShift?.id == shiftId) {
+        newCurrentShift = updatedShift;
+      }
+
+      // Update shifts list
+      final updatedShifts = state.shifts.map((shift) {
+        if (shift.id == shiftId) {
+          return updatedShift;
+        }
+        return shift;
+      }).toList();
+
+      state = state.copyWith(
+        isLoading: false,
+        shifts: updatedShifts,
+        currentShift: newCurrentShift ?? state.currentShift,
+      );
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      logger.error('Error ending break: ${e.toString()}');
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
     }
   }
 
-  void _updateShift(Shift updatedShift) {
-    final updatedShifts = state.shifts
-        .map((s) => s.id == updatedShift.id ? updatedShift : s)
-        .toList();
+  // Schedule a new shift
+  Future<void> scheduleShift(
+      String agentId, DateTime start, DateTime end, String timezone) async {
+    state = state.copyWith(isLoading: true, clearError: true);
 
-    state = state.copyWith(
-      shifts: updatedShifts,
-      currentShift:
-          updatedShift.isInProgress ? updatedShift : state.currentShift,
-    );
+    try {
+      final shift =
+          await _shiftService.scheduleShift(agentId, start, end, timezone);
+
+      // Add to list of shifts
+      final updatedShifts = [...state.shifts, shift];
+
+      state = state.copyWith(
+        isLoading: false,
+        shifts: updatedShifts,
+      );
+    } catch (e) {
+      logger.error('Error scheduling shift: ${e.toString()}');
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+    }
   }
 
-  void _initiateHandover() {
-    // Implement handover logic
-  }
-
-  void _handleBreakStatus(Break currentBreak) {
-    // Implement break status handling
-  }
-
-  @override
-  void dispose() {
-    _shiftTimer?.cancel();
-    super.dispose();
+  // Get shift by id
+  Shift? getShiftById(String shiftId) {
+    try {
+      return state.shifts.firstWhere((shift) => shift.id == shiftId);
+    } catch (_) {
+      return null;
+    }
   }
 }
+
+// Provider for the shift state
+final shiftProvider = StateNotifierProvider<ShiftNotifier, ShiftState>((ref) {
+  final shiftService = ref.watch(shiftServiceProvider);
+  return ShiftNotifier(shiftService);
+});

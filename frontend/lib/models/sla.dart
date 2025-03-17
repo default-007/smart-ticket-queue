@@ -1,7 +1,88 @@
-import 'package:flutter/material.dart';
 import 'package:json_annotation/json_annotation.dart';
 
 part 'sla.g.dart';
+
+@JsonSerializable()
+class TicketSLA {
+  @JsonKey(fromJson: _dateTimeFromJson, toJson: _dateTimeToJson)
+  final DateTime? responseDeadline;
+
+  final bool? responseTimeMet;
+
+  @JsonKey(fromJson: _dateTimeFromJson, toJson: _dateTimeToJson)
+  final DateTime? resolutionDeadline;
+
+  final bool? resolutionTimeMet;
+
+  final bool isBreached;
+
+  TicketSLA({
+    this.responseDeadline,
+    this.responseTimeMet,
+    this.resolutionDeadline,
+    this.resolutionTimeMet,
+    this.isBreached = false,
+  });
+
+  factory TicketSLA.fromJson(Map<String, dynamic> json) =>
+      _$TicketSLAFromJson(json);
+  Map<String, dynamic> toJson() => _$TicketSLAToJson(this);
+
+  // Custom JSON conversion for DateTime
+  static DateTime? _dateTimeFromJson(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return DateTime.parse(value);
+    return null;
+  }
+
+  static String? _dateTimeToJson(DateTime? dateTime) {
+    return dateTime?.toIso8601String();
+  }
+
+  // Calculate time until SLA response breach
+  Duration? get timeUntilResponseBreach {
+    if (responseTimeMet == true || responseDeadline == null) return null;
+
+    final now = DateTime.now();
+    if (now.isAfter(responseDeadline!)) return Duration.zero;
+
+    return responseDeadline!.difference(now);
+  }
+
+  // Calculate time until SLA resolution breach
+  Duration? get timeUntilResolutionBreach {
+    if (resolutionTimeMet == true || resolutionDeadline == null) return null;
+
+    final now = DateTime.now();
+    if (now.isAfter(resolutionDeadline!)) return Duration.zero;
+
+    return resolutionDeadline!.difference(now);
+  }
+
+  // Format time until breach for display
+  String getFormattedTimeUntilBreach() {
+    final responseTime = timeUntilResponseBreach;
+    final resolutionTime = timeUntilResolutionBreach;
+
+    if (isBreached) return 'Breached';
+
+    if (responseTime != null && !responseTimeMet!) {
+      if (responseTime.inMinutes <= 0) return 'Response Overdue';
+      if (responseTime.inMinutes < 60)
+        return '${responseTime.inMinutes}m to resp';
+      return '${responseTime.inHours}h to resp';
+    }
+
+    if (resolutionTime != null && !resolutionTimeMet!) {
+      if (resolutionTime.inMinutes <= 0) return 'Resolution Overdue';
+      if (resolutionTime.inMinutes < 60)
+        return '${resolutionTime.inMinutes}m to resolve';
+      return '${resolutionTime.inHours}h to resolve';
+    }
+
+    return 'On Track';
+  }
+}
 
 @JsonSerializable()
 class SLAConfig {
@@ -21,7 +102,6 @@ class SLAConfig {
 
   factory SLAConfig.fromJson(Map<String, dynamic> json) =>
       _$SLAConfigFromJson(json);
-
   Map<String, dynamic> toJson() => _$SLAConfigToJson(this);
 }
 
@@ -61,105 +141,26 @@ class SLAMetrics {
     required this.slaComplianceRate,
   });
 
-  factory SLAMetrics.fromJson(dynamic json) {
-    // If it's a list, take the first item
-    final data = json is List ? json.first : json;
-
-    return SLAMetrics(
-      totalTickets: data['totalTickets'] ?? 0,
-      responseSLABreaches: data['responseSLABreaches'] ?? 0,
-      resolutionSLABreaches: data['resolutionSLABreaches'] ?? 0,
-      averageResponseTime: data['averageResponseTime'],
-      averageResolutionTime: data['averageResolutionTime'],
-      slaComplianceRate: (data['slaComplianceRate'] as num?)?.toDouble() ?? 0.0,
-    );
-  }
-
+  factory SLAMetrics.fromJson(Map<String, dynamic> json) =>
+      _$SLAMetricsFromJson(json);
   Map<String, dynamic> toJson() => _$SLAMetricsToJson(this);
 
   String get complianceRateFormatted =>
       '${slaComplianceRate.toStringAsFixed(1)}%';
 
-  String get averageResponseTimeFormatted => averageResponseTime != null
-      ? '${averageResponseTime!.toStringAsFixed(1)} min'
-      : 'N/A';
-
-  String get averageResolutionTimeFormatted => averageResolutionTime != null
-      ? '${(averageResolutionTime! / 60).toStringAsFixed(1)} hrs'
-      : 'N/A';
-}
-
-@JsonSerializable()
-class TicketSLA {
-  final DateTime? responseDeadline;
-  final DateTime? resolutionDeadline;
-  final bool? responseTimeMet;
-  final bool? resolutionTimeMet;
-
-  TicketSLA({
-    this.responseDeadline,
-    this.resolutionDeadline,
-    this.responseTimeMet,
-    this.resolutionTimeMet,
-  });
-
-  factory TicketSLA.fromJson(Map<String, dynamic> json) {
-    return TicketSLA(
-      responseDeadline: json['responseTime'] != null &&
-              json['responseTime']['deadline'] != null
-          ? DateTime.parse(json['responseTime']['deadline'] as String)
-          : null,
-      resolutionDeadline: json['resolutionTime'] != null &&
-              json['resolutionTime']['deadline'] != null
-          ? DateTime.parse(json['resolutionTime']['deadline'] as String)
-          : null,
-      responseTimeMet: json['responseTime'] != null
-          ? json['responseTime']['met'] as bool?
-          : null,
-      resolutionTimeMet: json['resolutionTime'] != null
-          ? json['resolutionTime']['met'] as bool?
-          : null,
-    );
+  String get averageResponseTimeFormatted {
+    if (averageResponseTime == null) return 'N/A';
+    return '${averageResponseTime!.toStringAsFixed(0)} min';
   }
 
-  Map<String, dynamic> toJson() => _$TicketSLAToJson(this);
+  String get averageResolutionTimeFormatted {
+    if (averageResolutionTime == null) return 'N/A';
 
-  bool get isBreached =>
-      (responseTimeMet != null && !responseTimeMet!) ||
-      (resolutionTimeMet != null && !resolutionTimeMet!);
-
-  Duration? get timeUntilResponseBreach {
-    if (responseDeadline == null || responseTimeMet == true) return null;
-    return responseDeadline!.difference(DateTime.now());
-  }
-
-  Duration? get timeUntilResolutionBreach {
-    if (resolutionDeadline == null || resolutionTimeMet == true) return null;
-    return resolutionDeadline!.difference(DateTime.now());
-  }
-
-  String getFormattedTimeUntilBreach() {
-    final responseTime = timeUntilResponseBreach;
-    final resolutionTime = timeUntilResolutionBreach;
-
-    if (responseTime != null && responseTimeMet == false) {
-      return _formatDuration(responseTime);
-    } else if (resolutionTime != null && resolutionTimeMet == false) {
-      return _formatDuration(resolutionTime);
+    if (averageResolutionTime! < 60) {
+      return '${averageResolutionTime!.toStringAsFixed(0)} min';
+    } else {
+      final hours = (averageResolutionTime! / 60).toStringAsFixed(1);
+      return '$hours hr';
     }
-    return 'N/A';
-  }
-
-  String _formatDuration(Duration duration) {
-    if (duration.isNegative) {
-      return 'Breached';
-    }
-
-    if (duration.inHours > 24) {
-      return '${duration.inDays}d ${duration.inHours.remainder(24)}h';
-    } else if (duration.inHours > 0) {
-      return '${duration.inHours}h ${duration.inMinutes.remainder(60)}m';
-    }
-    return '${duration.inMinutes}m';
   }
 }

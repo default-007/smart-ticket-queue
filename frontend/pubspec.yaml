@@ -40,7 +40,7 @@ dependencies:
   shared_preferences: ^2.2.0
   intl: ^0.18.1
   flutter_secure_storage: ^8.0.0
-  json_annotation: ^4.8.1
+  json_annotation: ^4.9.0
   dio: ^5.3.2
   flutter_riverpod: ^2.3.7
   google_fonts: ^5.1.0

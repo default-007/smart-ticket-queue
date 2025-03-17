@@ -1,121 +1,213 @@
-# Smart Ticketing Flutter Frontend
+# Smart Ticketing System
 
-## Project Overview
+## Overview
 
-A comprehensive mobile application for managing support tickets, designed to streamline workflow for agents, supervisors, and users across different roles.
+Smart Ticketing is a ticketing management system designed to streamline support and service desk operations. This full-stack application provides a robust platform for tracking, managing, and resolving tickets across different departments and roles.
 
-## Key Features
+![Smart Ticketing Logo](https://via.placeholder.com/150x50?text=SmartTicketing)
 
-- 🔐 Secure Authentication
-- 📋 Ticket Management
-- 🕒 SLA Tracking
-- 🔔 Real-time Notifications
-- 📊 Workload Dashboard
-- 👥 Agent Status Management
-- 📆 Shift Management
+## Features
+
+- **User Authentication & Authorization** with role-based access control
+- **Comprehensive Ticket Management** with SLA tracking
+- **Agent Workload Management** with optimized assignments
+- **Real-time Notifications** via WebSockets
+- **Service Level Agreement (SLA)** monitoring and compliance tracking
+- **Shift Management** for agents with break scheduling
+- **Performance Analytics** and reporting
+
+## Technology Stack
+
+### Backend
+
+- **Server**: Node.js with Express.js
+- **Database**: MongoDB with Mongoose
+- **Authentication**: JWT (JSON Web Token)
+- **Real-time**: Socket.IO for WebSockets
+- **Task Scheduling**: Node-cron for automated tasks
+
+### Frontend
+
+- **Framework**: Flutter (cross-platform mobile application)
+- **State Management**: Riverpod
+- **Routing**: Go Router
+- **HTTP Client**: Dio
+- **Real-time**: Socket.IO Client
+- **Charts & Visualization**: FL Chart
 
 ## Project Structure
 
+The project is organized into two main components:
+
 ```
-lib/
+/
+├── backend/                     # Node.js/Express backend
+│   ├── src/                     # Backend source code
+│   │   ├── config/              # Configuration files
+│   │   ├── controllers/         # Request handlers
+│   │   ├── middleware/          # Express middleware
+│   │   ├── models/              # Mongoose models
+│   │   ├── routes/              # API endpoints
+│   │   ├── services/            # Business logic
+│   │   └── utils/               # Helper functions
+│   └── server.js                # Main entry point
 │
-├── main.dart                   # Application entry point
-│
-├── config/                     # Configuration files
-│   ├── api_config.dart
-│   └── theme.dart
-│
-├── models/                     # Data models
-│   ├── agent.dart
-│   ├── ticket.dart
-│   ├── notification.dart
-│   └── sla.dart
-│
-├── providers/                  # State management
-│   ├── auth_provider.dart
-│   ├── ticket_provider.dart
-│   ├── notification_provider.dart
-│   └── sla_provider.dart
-│
-├── screens/                    # UI Screens
-│   ├── auth/
-│   │   ├── login_screen.dart
-│   │   └── register_screen.dart
-│   ├── dashboard/
-│   │   ├── admin_dashboard.dart
-│   │   └── agent_dashboard.dart
-│   ├── tickets/
-│   │   ├── ticket_list_screen.dart
-│   │   └── ticket_detail_screen.dart
-│   └── shifts/
-│       └── shift_management_screen.dart
-│
-├── services/                   # API and data services
-│   ├── api_service.dart
-│   ├── auth_service.dart
-│   └── ticket_service.dart
-│
-└── widgets/                    # Reusable UI components
-    ├── tickets/
-    │   ├── ticket_card.dart
-    │   └── sla_status_indicator.dart
-    ├── agents/
-    │   └── agent_card.dart
-    └── common/
-        ├── custom_app_bar.dart
-        └── loading_indicator.dart
+└── frontend/                    # Flutter mobile application
+    └── lib/                     # Frontend source code
+        ├── config/              # App configuration
+        ├── models/              # Data models
+        ├── providers/           # State management
+        ├── screens/             # UI screens
+        ├── services/            # API services
+        └── widgets/             # Reusable UI components
 ```
 
-## Future Improvement Areas
+## Setup Instructions
 
-### Feature Enhancements
+### Prerequisites
 
-- [ ] Advanced Analytics Dashboard
-- [ ] Machine Learning-based Ticket Prioritization
-- [ ] Integrated Chat Support
-- [ ] Offline Mode Support
-- [ ] Multi-language Support
+- Node.js (v16+)
+- MongoDB (v4.4+)
+- Flutter SDK (v3.10+)
+- Dart SDK
+- Android Studio or VS Code
+- Xcode (for iOS development)
 
-### Technical Improvements
+### Backend Setup
 
-- [ ] Implement More Comprehensive Error Handling
-- [ ] Add More Unit and Widget Tests
-- [ ] Enhance Performance Optimization
-- [ ] Implement Advanced Caching Mechanisms
-- [ ] Improve State Management Patterns
+1. Clone the repository
 
-### UI/UX Improvements
+```bash
+git clone https://github.com/default-007/smart-ticket-queue.git
+cd smart-ticketing/backend
+```
 
-- [ ] Dark Mode Implementation
-- [ ] More Customizable Themes
-- [ ] Accessibility Enhancements
-- [ ] Animations and Micro-interactions
+2. Install dependencies
 
-## Performance Insights
+```bash
+npm install
+```
 
-- Utilizes Riverpod for efficient state management
-- Implements lazy loading and caching strategies
-- Uses efficient API calls with Dio
-- Real-time updates via WebSocket
+3. Create a `.env` file in the root directory with the following variables:
 
-## Development Tips
+```
+MONGODB_URI=mongodb://localhost:27017/smart_ticketing
+JWT_SECRET=your_jwt_secret
+PORT=5000
+CLIENT_URL=http://localhost:3000
+```
 
-- Run `flutter pub get` to install dependencies
-- Generate JSON serialization code: `dart run build_runner build --delete-conflicting-outputs`
-- Use `flutter analyze` to check code quality
-- Run tests with `flutter test`
+4. Start the development server
 
-### JSON Serialization
+```bash
+npm run dev
+```
 
-This project uses `json_serializable` for model generation. After making changes to model classes, run the build runner to generate corresponding `.g.dart` files.
+### Frontend Setup
+
+1. Navigate to the frontend directory
+
+```bash
+cd ../frontend
+```
+
+2. Get Flutter dependencies
+
+```bash
+flutter pub get
+```
+
+3. Configure API Endpoint in `lib/config/api_config.dart`:
+
+```dart
+static String get baseUrl {
+  if (Platform.isAndroid) {
+    return 'http://10.0.2.2:5000/api';  // For Android Emulator
+  } else if (Platform.isIOS) {
+    return 'http://localhost:5000/api'; // For iOS Simulator
+  }
+  return 'http://your-local-ip:5000/api'; // For physical devices
+}
+```
+
+4. Generate JSON serialization code
+
+```bash
+dart run build_runner build --delete-conflicting-outputs
+```
+
+5. Run the application
+
+```bash
+flutter run
+```
+
+## Key Features Explained
+
+### Ticket Management
+
+The system provides comprehensive ticket tracking from creation to resolution:
+
+- **Ticket Creation**: Users can create tickets with priority, category, and due dates
+- **Ticket Assignment**: Automatic or manual assignment to appropriate agents
+- **SLA Tracking**: Automatic monitoring of response and resolution time commitments
+- **Escalation**: Automatic escalation for SLA breaches
+- **Status Updates**: Track ticket progress through the resolution lifecycle
+
+### Agent Management
+
+Efficiently manage agent workloads and availability:
+
+- **Status Tracking**: Monitor agent availability (online, busy, offline)
+- **Shift Management**: Schedule and track agent work hours
+- **Break Management**: Plan and track agent breaks
+- **Workload Balancing**: Evenly distribute tickets among available agents
+- **Skills-based Assignment**: Route tickets to agents with appropriate skills
+
+### Real-time Notifications
+
+Stay informed with immediate updates:
+
+- **SLA Alerts**: Get notified when tickets approach SLA breach
+- **Assignment Notifications**: Agents are alerted when new tickets are assigned
+- **Status Updates**: All relevant parties notified on ticket status changes
+- **WebSocket Integration**: Real-time updates across devices
+
+## API Documentation
+
+The backend provides a RESTful API with the following main endpoints:
+
+- **Authentication**: `/api/auth`
+- **Tickets**: `/api/tickets`
+- **Agents**: `/api/agents`
+- **SLA**: `/api/sla`
+- **Workload**: `/api/workload`
+- **Notifications**: `/api/notifications`
+- **Shifts**: `/api/shifts`
+
+For detailed API documentation, please refer to the API docs (coming soon).
+
+## Future Roadmap
+
+- **AI-powered Ticket Routing**: Implement machine learning for optimal assignment
+- **Advanced Analytics Dashboard**: Enhanced reporting and insights
+- **External Integrations**: APIs for connecting with other systems
+- **Comprehensive Mobile Apps**: Native mobile experiences
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push and create a Pull Request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-MIT License
+Distributed under the MIT License. See `LICENSE` for more information.
+
+## Contact
+
+Brian Otieno - brianokola@gmail.com
+
+Project Link: [https://github.com/default-007/smart-ticket-queue](https://github.com/default-007/smart-ticket-queue)

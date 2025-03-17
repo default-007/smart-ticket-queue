@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:smart_ticketing/models/shift.dart';
+import '../../../models/shift.dart';
 
 class ShiftDetailsSheet extends StatelessWidget {
   final Shift shift;
@@ -12,7 +12,8 @@ class ShiftDetailsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final timeFormatter = DateFormat('HH:mm');
+    final timeFormatter = DateFormat('h:mm a');
+    final dateFormatter = DateFormat('MMM dd, yyyy');
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -36,6 +37,12 @@ class ShiftDetailsSheet extends StatelessWidget {
           const SizedBox(height: 16),
           _buildDetailRow(
             context,
+            'Date',
+            dateFormatter.format(shift.start),
+            Icons.calendar_today,
+          ),
+          _buildDetailRow(
+            context,
             'Time',
             '${timeFormatter.format(shift.start)} - ${timeFormatter.format(shift.end)}',
             Icons.access_time,
@@ -43,13 +50,13 @@ class ShiftDetailsSheet extends StatelessWidget {
           _buildDetailRow(
             context,
             'Duration',
-            '${shift.end.difference(shift.start).inHours}h',
-            Icons.timer,
+            _formatDuration(shift.duration),
+            Icons.timelapse,
           ),
           _buildDetailRow(
             context,
             'Status',
-            _getShiftStatus(),
+            _formatStatus(shift.status),
             Icons.info_outline,
           ),
           if (shift.breaks.isNotEmpty) ...[
@@ -73,10 +80,11 @@ class ShiftDetailsSheet extends StatelessWidget {
                   leading: Icon(
                     _getBreakIcon(breakItem.type),
                     size: 20,
+                    color: _getBreakColor(breakItem.status),
                   ),
-                  title: Text(breakItem.type.toString().split('.').last),
+                  title: Text(_formatBreakType(breakItem.type)),
                   subtitle: Text(
-                    '${timeFormatter.format(breakItem.start)} - ${timeFormatter.format(breakItem.end)}',
+                    '${timeFormatter.format(breakItem.start)} - ${timeFormatter.format(breakItem.end)} (${breakItem.duration.inMinutes} min)',
                   ),
                   trailing: _getBreakStatusChip(breakItem.status),
                 );
@@ -98,7 +106,7 @@ class ShiftDetailsSheet extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Colors.grey),
+          Icon(icon, size: 20, color: Colors.grey[700]),
           const SizedBox(width: 8),
           Text(
             '$label:',
@@ -111,10 +119,34 @@ class ShiftDetailsSheet extends StatelessWidget {
     );
   }
 
-  String _getShiftStatus() {
-    if (shift.isInProgress) return 'In Progress';
-    if (shift.start.isAfter(DateTime.now())) return 'Upcoming';
-    return 'Completed';
+  String _formatStatus(String status) {
+    return status
+        .split('-')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+
+    if (hours > 0) {
+      return '$hours hr ${minutes > 0 ? '$minutes min' : ''}';
+    } else {
+      return '$minutes min';
+    }
+  }
+
+  String _formatBreakType(BreakType type) {
+    final typeString = type.toString().split('.').last;
+    // Convert camelCase to Title Case with spaces
+    return typeString
+        .replaceAllMapped(
+          RegExp(r'([A-Z])'),
+          (match) => ' ${match.group(0)}',
+        )
+        .trim()
+        .replaceFirst(typeString[0], typeString[0].toUpperCase());
   }
 
   IconData _getBreakIcon(BreakType type) {
@@ -130,22 +162,31 @@ class ShiftDetailsSheet extends StatelessWidget {
     }
   }
 
-  Widget _getBreakStatusChip(BreakStatus status) {
-    Color color;
+  Color _getBreakColor(BreakStatus status) {
     switch (status) {
       case BreakStatus.scheduled:
-        color = Colors.blue;
-        break;
+        return Colors.blue;
       case BreakStatus.inProgress:
-        color = Colors.orange;
-        break;
+        return Colors.orange;
       case BreakStatus.completed:
-        color = Colors.green;
-        break;
+        return Colors.green;
       case BreakStatus.cancelled:
-        color = Colors.red;
-        break;
+        return Colors.red;
     }
+  }
+
+  Widget _getBreakStatusChip(BreakStatus status) {
+    final color = _getBreakColor(status);
+    final statusText = status.toString().split('.').last;
+
+    // Convert camelCase to Title Case with spaces
+    final displayText = statusText
+        .replaceAllMapped(
+          RegExp(r'([A-Z])'),
+          (match) => ' ${match.group(0)}',
+        )
+        .trim()
+        .replaceFirst(statusText[0], statusText[0].toUpperCase());
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -154,7 +195,7 @@ class ShiftDetailsSheet extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        status.toString().split('.').last,
+        displayText,
         style: TextStyle(
           color: color,
           fontSize: 12,

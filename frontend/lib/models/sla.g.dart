@@ -6,6 +6,24 @@ part of 'sla.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
+TicketSLA _$TicketSLAFromJson(Map<String, dynamic> json) => TicketSLA(
+      responseDeadline: TicketSLA._dateTimeFromJson(json['responseDeadline']),
+      responseTimeMet: json['responseTimeMet'] as bool?,
+      resolutionDeadline:
+          TicketSLA._dateTimeFromJson(json['resolutionDeadline']),
+      resolutionTimeMet: json['resolutionTimeMet'] as bool?,
+      isBreached: json['isBreached'] as bool? ?? false,
+    );
+
+Map<String, dynamic> _$TicketSLAToJson(TicketSLA instance) => <String, dynamic>{
+      'responseDeadline': TicketSLA._dateTimeToJson(instance.responseDeadline),
+      'responseTimeMet': instance.responseTimeMet,
+      'resolutionDeadline':
+          TicketSLA._dateTimeToJson(instance.resolutionDeadline),
+      'resolutionTimeMet': instance.resolutionTimeMet,
+      'isBreached': instance.isBreached,
+    };
+
 SLAConfig _$SLAConfigFromJson(Map<String, dynamic> json) => SLAConfig(
       priority: (json['priority'] as num).toInt(),
       category: json['category'] as String,
@@ -58,22 +76,4 @@ Map<String, dynamic> _$SLAMetricsToJson(SLAMetrics instance) =>
       'averageResponseTime': instance.averageResponseTime,
       'averageResolutionTime': instance.averageResolutionTime,
       'slaComplianceRate': instance.slaComplianceRate,
-    };
-
-TicketSLA _$TicketSLAFromJson(Map<String, dynamic> json) => TicketSLA(
-      responseDeadline: json['responseDeadline'] == null
-          ? null
-          : DateTime.parse(json['responseDeadline'] as String),
-      resolutionDeadline: json['resolutionDeadline'] == null
-          ? null
-          : DateTime.parse(json['resolutionDeadline'] as String),
-      responseTimeMet: json['responseTimeMet'] as bool?,
-      resolutionTimeMet: json['resolutionTimeMet'] as bool?,
-    );
-
-Map<String, dynamic> _$TicketSLAToJson(TicketSLA instance) => <String, dynamic>{
-      'responseDeadline': instance.responseDeadline?.toIso8601String(),
-      'resolutionDeadline': instance.resolutionDeadline?.toIso8601String(),
-      'responseTimeMet': instance.responseTimeMet,
-      'resolutionTimeMet': instance.resolutionTimeMet,
     };

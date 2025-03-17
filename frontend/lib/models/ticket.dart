@@ -1,26 +1,48 @@
+// lib/models/ticket.dart
 import 'package:json_annotation/json_annotation.dart';
+import 'package:flutter/material.dart';
 import 'agent.dart';
 import 'sla.dart';
 
 part 'ticket.g.dart';
 
-@JsonSerializable()
+@JsonSerializable(explicitToJson: true)
 class Ticket {
+  @JsonKey(name: '_id') // Map MongoDB _id to id
   final String id;
   final String title;
   final String description;
   final String status;
   final int priority;
+  final String category;
   final DateTime dueDate;
   final double estimatedHours;
-  final Agent? assignedTo; // Note the nullable type
+
+  @JsonKey(fromJson: _agentFromJson, toJson: _agentToJson)
+  final Agent? assignedTo; // Agent who the ticket is assigned to
+
+  @JsonKey(name: 'createdBy', fromJson: _createdByFromJson)
   final String createdBy;
+
+  final String department;
+
+  @JsonKey(defaultValue: [])
+  final List<String> requiredSkills;
+
+  @JsonKey(fromJson: _slaFromJson, toJson: _slaToJson)
+  final TicketSLA? sla;
+
+  @JsonKey(defaultValue: 0)
+  final int escalationLevel;
+
+  @JsonKey(fromJson: _historyFromJson)
+  final List<TicketHistory> history;
+
+  final DateTime? firstResponseTime;
+  final DateTime? resolvedAt;
+  final int? resolutionTime;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final TicketSLA? sla;
-  final String department;
-  final List<String>? requiredSkills;
-  final int escalationLevel;
 
   Ticket({
     required this.id,
@@ -28,56 +50,115 @@ class Ticket {
     required this.description,
     required this.status,
     required this.priority,
+    required this.category,
     required this.dueDate,
     required this.estimatedHours,
-    this.assignedTo, // Properly marked as optional
+    this.assignedTo,
     required this.createdBy,
+    required this.department,
+    required this.requiredSkills,
+    this.sla,
+    this.escalationLevel = 0,
+    required this.history,
+    this.firstResponseTime,
+    this.resolvedAt,
+    this.resolutionTime,
     required this.createdAt,
     required this.updatedAt,
-    this.sla,
-    required this.department,
-    this.requiredSkills,
-    this.escalationLevel = 0,
   });
 
   factory Ticket.fromJson(Map<String, dynamic> json) {
-    return Ticket(
-      id: json['_id'] as String,
-      title: json['title'] as String,
-      description: json['description'] as String,
-      status: json['status'] as String,
-      priority: json['priority'] as int,
-      dueDate: DateTime.parse(json['dueDate'] as String),
-      estimatedHours: (json['estimatedHours'] as num).toDouble(),
-      // Handle assignedTo as it might be null or an object
-      assignedTo: json['assignedTo'] != null
-          ? (json['assignedTo'] is String
-              ? null // Handle string ID case, likely no agent details available
-              : Agent.fromJson(json['assignedTo'] as Map<String, dynamic>))
-          : null,
-      // Handle createdBy which comes as an object
-      createdBy: json['createdBy'] is String
-          ? json['createdBy'] as String
-          : (json['createdBy'] as Map<String, dynamic>)['_id'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
-      // Handle nullable SLA field
-      sla: json['sla'] != null
-          ? TicketSLA.fromJson(json['sla'] as Map<String, dynamic>)
-          : null,
-      department: json['department'] as String,
-      // Handle nullable requiredSkills
-      requiredSkills: json['requiredSkills'] != null
-          ? List<String>.from(json['requiredSkills'] as List)
-          : null,
-      escalationLevel: json['escalationLevel'] as int? ?? 0,
-    );
+    // Copy json map to avoid modifying the original
+    final jsonCopy = Map<String, dynamic>.from(json);
+
+    // Handle _id if exists
+    if (jsonCopy.containsKey('_id') && !jsonCopy.containsKey('id')) {
+      jsonCopy['id'] = jsonCopy['_id'];
+    }
+
+    try {
+      return _$TicketFromJson(jsonCopy);
+    } catch (e) {
+      print('Error in Ticket.fromJson: $e');
+      throw e;
+    }
   }
 
   Map<String, dynamic> toJson() => _$TicketToJson(this);
 
-  bool get isOverdue => DateTime.now().isAfter(dueDate);
+  // Custom JSON conversion methods for Agent
+  static Agent? _agentFromJson(Map<String, dynamic>? json) {
+    if (json == null) return null;
+    try {
+      return Agent.fromJson(json);
+    } catch (e) {
+      print('Error parsing Agent: $e');
+      return null;
+    }
+  }
+
+  static Map<String, dynamic>? _agentToJson(Agent? agent) => agent?.toJson();
+
+  // Parsing createdBy which could be a string ID or an object with _id
+  static String _createdByFromJson(dynamic createdBy) {
+    if (createdBy is String) {
+      return createdBy;
+    } else if (createdBy is Map<String, dynamic> &&
+        createdBy.containsKey('_id')) {
+      return createdBy['_id'].toString();
+    }
+    throw Exception('Invalid createdBy format: $createdBy');
+  }
+
+  // Custom JSON conversion methods for SLA
+  static TicketSLA? _slaFromJson(Map<String, dynamic>? json) {
+    if (json == null) return null;
+    try {
+      return TicketSLA.fromJson(json);
+    } catch (e) {
+      print('Error parsing SLA: $e');
+      return null;
+    }
+  }
+
+  static Map<String, dynamic>? _slaToJson(TicketSLA? sla) => sla?.toJson();
+
+  // Handle history parsing
+  static List<TicketHistory> _historyFromJson(dynamic history) {
+    if (history is! List) return [];
+
+    return history.map((item) {
+      try {
+        if (item is Map<String, dynamic>) {
+          return TicketHistory.fromJson(item);
+        }
+        throw Exception('History item is not a Map: $item');
+      } catch (e) {
+        print('Error parsing history item: $e');
+        // Return a placeholder history item
+        return TicketHistory(
+          action: 'error',
+          timestamp: DateTime.now(),
+        );
+      }
+    }).toList();
+  }
+
+  // Getters for derived properties
+  bool get isOverdue =>
+      dueDate.isBefore(DateTime.now()) &&
+      status != 'resolved' &&
+      status != 'closed';
+
   bool get isEscalated => escalationLevel > 0 || status == 'escalated';
+
+  // New getter to fix the missing isSLABreached property
+  bool get isSLABreached => sla?.isBreached ?? false;
+
+  String get statusDisplay => status
+      .split('-')
+      .map((word) => word[0].toUpperCase() + word.substring(1))
+      .join(' ');
 
   String get priorityText {
     switch (priority) {
@@ -92,34 +173,93 @@ class Ticket {
     }
   }
 
-  String get statusDisplay {
-    return status
-        .split('-')
-        .map((word) => word[0].toUpperCase() + word.substring(1))
-        .join(' ');
+  // Create a copy of the ticket with updated fields
+  Ticket copyWith({
+    String? id,
+    String? title,
+    String? description,
+    String? status,
+    int? priority,
+    String? category,
+    DateTime? dueDate,
+    double? estimatedHours,
+    Agent? assignedTo,
+    String? createdBy,
+    String? department,
+    List<String>? requiredSkills,
+    TicketSLA? sla,
+    int? escalationLevel,
+    List<TicketHistory>? history,
+    DateTime? firstResponseTime,
+    DateTime? resolvedAt,
+    int? resolutionTime,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Ticket(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      status: status ?? this.status,
+      priority: priority ?? this.priority,
+      category: category ?? this.category,
+      dueDate: dueDate ?? this.dueDate,
+      estimatedHours: estimatedHours ?? this.estimatedHours,
+      assignedTo: assignedTo ?? this.assignedTo,
+      createdBy: createdBy ?? this.createdBy,
+      department: department ?? this.department,
+      requiredSkills: requiredSkills ?? this.requiredSkills,
+      sla: sla ?? this.sla,
+      escalationLevel: escalationLevel ?? this.escalationLevel,
+      history: history ?? this.history,
+      firstResponseTime: firstResponseTime ?? this.firstResponseTime,
+      resolvedAt: resolvedAt ?? this.resolvedAt,
+      resolutionTime: resolutionTime ?? this.resolutionTime,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
   }
+}
 
-  // Add method to get escalation status text
-  String get escalationStatusText {
-    if (!isEscalated) return 'Not Escalated';
-    return 'Level $escalationLevel Escalation';
-  }
+@JsonSerializable()
+class TicketHistory {
+  final String action;
+  final String? performedBy;
+  final DateTime timestamp;
+  final Map<String, dynamic>? details;
 
-  // Add a method to check SLA status
-  bool get isSLABreached {
-    return sla?.isBreached ?? false;
-  }
+  TicketHistory({
+    required this.action,
+    this.performedBy,
+    required this.timestamp,
+    this.details,
+  });
 
-  // Add a method to get time until next SLA breach
-  Duration? get timeUntilSLABreach {
-    if (sla == null) return null;
+  factory TicketHistory.fromJson(Map<String, dynamic> json) {
+    try {
+      // Create a copy of the map to avoid modifying the original
+      final jsonCopy = Map<String, dynamic>.from(json);
 
-    final responseTime = sla!.timeUntilResponseBreach;
-    final resolutionTime = sla!.timeUntilResolutionBreach;
+      // Handle MongoDB _id
+      if (jsonCopy.containsKey('_id') && !jsonCopy.containsKey('id')) {
+        jsonCopy['id'] = jsonCopy['_id'];
+      }
 
-    if (responseTime != null && resolutionTime != null) {
-      return responseTime < resolutionTime ? responseTime : resolutionTime;
+      // Map the timestamp if it's missing
+      if (!jsonCopy.containsKey('timestamp') && jsonCopy.containsKey('date')) {
+        jsonCopy['timestamp'] = jsonCopy['date'];
+      }
+
+      return _$TicketHistoryFromJson(jsonCopy);
+    } catch (e) {
+      print('Error in TicketHistory.fromJson: $e');
+      return TicketHistory(
+        action: 'error',
+        timestamp: DateTime.now(),
+        details: {'error': e.toString()},
+      );
     }
-    return responseTime ?? resolutionTime;
   }
+
+  Map<String, dynamic> toJson() => _$TicketHistoryToJson(this);
 }

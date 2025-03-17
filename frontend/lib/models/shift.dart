@@ -1,61 +1,10 @@
 // lib/models/shift.dart
-import 'package:json_annotation/json_annotation.dart';
+import 'package:flutter/material.dart';
 
-part 'shift.g.dart';
+enum BreakType { lunch, shortBreak, training, meeting }
 
-@JsonSerializable()
-class Shift {
-  final String id;
-  final String agentId;
-  final DateTime start;
-  final DateTime end;
-  final String timezone;
-  final List<Break> breaks;
-  final bool isActive;
-  final HandoverStatus? handoverStatus;
+enum BreakStatus { scheduled, inProgress, completed, cancelled }
 
-  Shift({
-    required this.id,
-    required this.agentId,
-    required this.start,
-    required this.end,
-    required this.timezone,
-    this.breaks = const [],
-    this.isActive = false,
-    this.handoverStatus,
-  });
-
-  factory Shift.fromJson(Map<String, dynamic> json) => _$ShiftFromJson(json);
-  Map<String, dynamic> toJson() => _$ShiftToJson(this);
-
-  bool get isInProgress {
-    final now = DateTime.now();
-    return now.isAfter(start) && now.isBefore(end);
-  }
-
-  Duration get remainingTime {
-    final now = DateTime.now();
-    return end.difference(now);
-  }
-
-  Break? get currentBreak {
-    final now = DateTime.now();
-    try {
-      return breaks.firstWhere(
-        (b) => now.isAfter(b.start) && now.isBefore(b.end),
-      );
-    } catch (e) {
-      return null;
-    }
-  }
-
-  bool get needsHandover {
-    final remaining = remainingTime.inMinutes;
-    return remaining > 0 && remaining <= 30 && handoverStatus == null;
-  }
-}
-
-@JsonSerializable()
 class Break {
   final String id;
   final DateTime start;
@@ -71,33 +20,164 @@ class Break {
     this.status = BreakStatus.scheduled,
   });
 
-  factory Break.fromJson(Map<String, dynamic> json) => _$BreakFromJson(json);
-  Map<String, dynamic> toJson() => _$BreakToJson(this);
-
   Duration get duration => end.difference(start);
+
+  factory Break.fromJson(Map<String, dynamic> json) {
+    return Break(
+      id: json['id'] ?? '',
+      start: DateTime.parse(json['start']),
+      end: DateTime.parse(json['end']),
+      type: _parseBreakType(json['type']),
+      status: _parseBreakStatus(json['status']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'start': start.toIso8601String(),
+      'end': end.toIso8601String(),
+      'type': type.toString().split('.').last,
+      'status': status.toString().split('.').last,
+    };
+  }
+
+  Break copyWith({
+    String? id,
+    DateTime? start,
+    DateTime? end,
+    BreakType? type,
+    BreakStatus? status,
+  }) {
+    return Break(
+      id: id ?? this.id,
+      start: start ?? this.start,
+      end: end ?? this.end,
+      type: type ?? this.type,
+      status: status ?? this.status,
+    );
+  }
+
+  static BreakType _parseBreakType(String? typeStr) {
+    if (typeStr == null) return BreakType.shortBreak;
+
+    switch (typeStr.toLowerCase()) {
+      case 'lunch':
+        return BreakType.lunch;
+      case 'training':
+        return BreakType.training;
+      case 'meeting':
+        return BreakType.meeting;
+      case 'shortbreak':
+      case 'short_break':
+      default:
+        return BreakType.shortBreak;
+    }
+  }
+
+  static BreakStatus _parseBreakStatus(String? statusStr) {
+    if (statusStr == null) return BreakStatus.scheduled;
+
+    switch (statusStr.toLowerCase()) {
+      case 'inprogress':
+      case 'in_progress':
+      case 'in-progress':
+        return BreakStatus.inProgress;
+      case 'completed':
+        return BreakStatus.completed;
+      case 'cancelled':
+      case 'canceled':
+        return BreakStatus.cancelled;
+      case 'scheduled':
+      default:
+        return BreakStatus.scheduled;
+    }
+  }
 }
 
-enum BreakType { lunch, shortBreak, training, meeting }
+class Shift {
+  final String id;
+  final DateTime start;
+  final DateTime end;
+  final String timezone;
+  final String status;
+  final List<Break> breaks;
 
-enum BreakStatus { scheduled, inProgress, completed, cancelled }
-
-enum HandoverStatus { pending, inProgress, completed, skipped }
-
-@JsonSerializable()
-class ShiftSchedule {
-  final String agentId;
-  final List<Shift> shifts;
-  final Map<String, List<String>> preferredHours;
-  final Map<String, bool> availability;
-
-  ShiftSchedule({
-    required this.agentId,
-    required this.shifts,
-    required this.preferredHours,
-    required this.availability,
+  Shift({
+    required this.id,
+    required this.start,
+    required this.end,
+    this.timezone = 'UTC',
+    this.status = 'in-progress',
+    this.breaks = const [],
   });
 
-  factory ShiftSchedule.fromJson(Map<String, dynamic> json) =>
-      _$ShiftScheduleFromJson(json);
-  Map<String, dynamic> toJson() => _$ShiftScheduleToJson(this);
+  Duration get duration => end.difference(start);
+
+  Duration get remainingTime {
+    final now = DateTime.now();
+    if (now.isAfter(end)) return Duration.zero;
+    if (now.isBefore(start)) return duration;
+    return end.difference(now);
+  }
+
+  bool get isInProgress {
+    final now = DateTime.now();
+    return now.isAfter(start) && now.isBefore(end) && status == 'in-progress';
+  }
+
+  // Find current break if any
+  Break? get currentBreak {
+    final now = DateTime.now();
+    return breaks.firstWhere(
+      (breakItem) =>
+          breakItem.status == BreakStatus.inProgress &&
+          now.isAfter(breakItem.start) &&
+          now.isBefore(breakItem.end),
+      orElse: () => null as Break,
+    );
+  }
+
+  factory Shift.fromJson(Map<String, dynamic> json) {
+    return Shift(
+      id: json['id'] ?? '',
+      start: DateTime.parse(json['start']),
+      end: DateTime.parse(json['end']),
+      timezone: json['timezone'] ?? 'UTC',
+      status: json['status'] ?? 'in-progress',
+      breaks: (json['breaks'] as List?)
+              ?.map((breakJson) => Break.fromJson(breakJson))
+              .toList() ??
+          [],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'start': start.toIso8601String(),
+      'end': end.toIso8601String(),
+      'timezone': timezone,
+      'status': status,
+      'breaks': breaks.map((breakItem) => breakItem.toJson()).toList(),
+    };
+  }
+
+  Shift copyWith({
+    String? id,
+    DateTime? start,
+    DateTime? end,
+    String? timezone,
+    String? status,
+    List<Break>? breaks,
+  }) {
+    return Shift(
+      id: id ?? this.id,
+      start: start ?? this.start,
+      end: end ?? this.end,
+      timezone: timezone ?? this.timezone,
+      status: status ?? this.status,
+      breaks: breaks ?? this.breaks,
+    );
+  }
 }

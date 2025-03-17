@@ -1,14 +1,14 @@
+// lib/screens/tickets/ticket_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smart_ticketing/widgets/common/custom_app_bar.dart';
 import 'package:smart_ticketing/widgets/common/custom_drawer.dart';
 import 'package:smart_ticketing/widgets/common/error_display.dart';
+import 'package:smart_ticketing/widgets/common/loading_indicator.dart';
 import '../../providers/ticket_provider.dart';
 import '../../widgets/tickets/ticket_card.dart';
 import '../../widgets/tickets/ticket_filter.dart';
-
-final ticketsLoadedProvider = StateProvider<bool>((ref) => false);
 
 class TicketListScreen extends ConsumerStatefulWidget {
   const TicketListScreen({Key? key}) : super(key: key);
@@ -19,32 +19,55 @@ class TicketListScreen extends ConsumerStatefulWidget {
 
 class _TicketListScreenState extends ConsumerState<TicketListScreen> {
   String? _selectedStatus;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Initial load without filters
-      ref.read(ticketProvider.notifier).loadTickets();
-      ref.read(ticketsLoadedProvider.notifier).state = true;
+    // Ensure we load tickets when the screen initializes
+    Future.microtask(() => _loadTickets(forceRefresh: true));
+  }
+
+  Future<void> _loadTickets({bool forceRefresh = false}) async {
+    setState(() {
+      _isLoading = true;
     });
-    /* WidgetsBinding.instance.addPostFrameCallback((_) {
-      final isLoaded = ref.read(ticketsLoadedProvider);
-      if (!isLoaded) {
-        ref.read(ticketProvider.notifier).loadTickets();
-        ref.read(ticketsLoadedProvider.notifier).state = true;
+
+    try {
+      await ref.read(ticketProvider.notifier).loadTickets(
+            status: _selectedStatus,
+            forceRefresh: forceRefresh,
+          );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading tickets: $e')),
+        );
       }
-    }); */
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final ticketState = ref.watch(ticketProvider);
-    print(
-        'Ticket state: ${ticketState.tickets.length} tickets, error: ${ticketState.errorMessage}');
 
     return Scaffold(
-      appBar: const CustomAppBar(title: 'Tickets'),
+      appBar: CustomAppBar(
+        title: 'Tickets',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => _loadTickets(forceRefresh: true),
+            tooltip: 'Refresh tickets',
+          ),
+        ],
+      ),
       drawer: const CustomDrawer(),
       body: Column(
         children: [
@@ -55,23 +78,18 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
                 _selectedStatus = status;
               });
               // Force reload with the new filter
-              ref.read(ticketsLoadedProvider.notifier).state = false;
-              ref.read(ticketProvider.notifier).loadTickets(status: status);
+              _loadTickets(forceRefresh: true);
             },
           ),
           Expanded(
-            child: ticketState.isLoading
+            child: _isLoading || ticketState.isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : ticketState.hasError
                     ? ErrorDisplay(
                         message: ticketState.errorMessage ??
                             'An unknown error occurred',
                         onRetry: () {
-                          Future.microtask(() {
-                            ref
-                                .read(ticketProvider.notifier)
-                                .loadTickets(status: _selectedStatus);
-                          });
+                          _loadTickets(forceRefresh: true);
                         },
                       )
                     : _buildTicketList(ticketState.tickets),
@@ -80,29 +98,47 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          GoRouter.of(context).push('/tickets/create');
+          context.push('/tickets/create');
         },
+        tooltip: 'Create new ticket',
         child: const Icon(Icons.add),
       ),
     );
   }
 
   Widget _buildTicketList(List tickets) {
-    print('Building ticket list with ${tickets.length} tickets: $tickets');
     if (tickets.isEmpty) {
       return const Center(
-        child: Text('No tickets found'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.inbox_outlined,
+              size: 64,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'No tickets found',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Create a new ticket or change your filter',
+              style: TextStyle(
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
     return RefreshIndicator(
-      onRefresh: () async {
-        // Reset loaded state and reload tickets
-        ref.read(ticketsLoadedProvider.notifier).state = false;
-        await ref
-            .read(ticketProvider.notifier)
-            .loadTickets(status: _selectedStatus);
-      },
+      onRefresh: () => _loadTickets(forceRefresh: true),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: tickets.length,
@@ -111,7 +147,14 @@ class _TicketListScreenState extends ConsumerState<TicketListScreen> {
           return TicketCard(
             ticket: ticket,
             onTap: () {
-              GoRouter.of(context).push('/tickets/detail', extra: ticket);
+              context.push('/tickets/detail', extra: ticket);
+            },
+            onStatusUpdate: (newStatus) {
+              // Allow updating ticket status directly from the list
+              ref.read(ticketProvider.notifier).updateTicketStatus(
+                    ticket.id,
+                    newStatus,
+                  );
             },
           );
         },

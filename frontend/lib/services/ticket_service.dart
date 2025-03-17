@@ -1,6 +1,6 @@
+// lib/services/ticket_service.dart
 import 'package:dio/dio.dart';
 import 'package:smart_ticketing/services/api_service.dart';
-
 import '../models/ticket.dart';
 
 class TicketService {
@@ -48,6 +48,13 @@ class TicketService {
       final tickets = <Ticket>[];
       for (var ticketJson in response.data['data']) {
         try {
+          // Normalize the ID field
+          if (ticketJson is Map<String, dynamic>) {
+            if (ticketJson.containsKey('_id') &&
+                !ticketJson.containsKey('id')) {
+              ticketJson['id'] = ticketJson['_id'];
+            }
+          }
           final ticket = Ticket.fromJson(ticketJson);
           tickets.add(ticket);
         } catch (e) {
@@ -72,7 +79,15 @@ class TicketService {
         throw Exception('Invalid response format or ticket not found');
       }
 
-      return Ticket.fromJson(response.data['data']);
+      // Normalize ID field for MongoDB format
+      final ticketData = response.data['data'];
+      if (ticketData is Map<String, dynamic>) {
+        if (ticketData.containsKey('_id') && !ticketData.containsKey('id')) {
+          ticketData['id'] = ticketData['_id'];
+        }
+      }
+
+      return Ticket.fromJson(ticketData);
     } catch (e) {
       print('Error in getTicketById: $e');
       throw _handleError(e);
@@ -82,7 +97,17 @@ class TicketService {
   Future<Ticket> createTicket(Map<String, dynamic> ticketData) async {
     try {
       final response = await _apiService.post('/tickets', ticketData);
-      return Ticket.fromJson(response.data['data']);
+
+      // Normalize ID field
+      final responseData = response.data['data'];
+      if (responseData is Map<String, dynamic>) {
+        if (responseData.containsKey('_id') &&
+            !responseData.containsKey('id')) {
+          responseData['id'] = responseData['_id'];
+        }
+      }
+
+      return Ticket.fromJson(responseData);
     } catch (e) {
       throw _handleError(e);
     }
@@ -92,7 +117,17 @@ class TicketService {
     try {
       final response = await _apiService
           .put('/tickets/$ticketId/status', {'status': status});
-      return Ticket.fromJson(response.data['data']);
+
+      // Normalize ID field
+      final responseData = response.data['data'];
+      if (responseData is Map<String, dynamic>) {
+        if (responseData.containsKey('_id') &&
+            !responseData.containsKey('id')) {
+          responseData['id'] = responseData['_id'];
+        }
+      }
+
+      return Ticket.fromJson(responseData);
     } catch (e) {
       throw _handleError(e);
     }
@@ -104,7 +139,16 @@ class TicketService {
       final response = await _apiService.put(
           '/tickets/$ticketId/status', {'status': status, 'agentId': agentId});
 
-      return Ticket.fromJson(response.data['data']);
+      // Normalize ID field
+      final responseData = response.data['data'];
+      if (responseData is Map<String, dynamic>) {
+        if (responseData.containsKey('_id') &&
+            !responseData.containsKey('id')) {
+          responseData['id'] = responseData['_id'];
+        }
+      }
+
+      return Ticket.fromJson(responseData);
     } catch (e) {
       throw _handleError(e);
     }
@@ -122,9 +166,16 @@ class TicketService {
         },
       );
 
-      return (response.data['data'] as List)
-          .map((json) => Ticket.fromJson(json))
-          .toList();
+      final List<dynamic> ticketsJson = response.data['data'];
+      return ticketsJson.map((json) {
+        // Normalize ID field
+        if (json is Map<String, dynamic>) {
+          if (json.containsKey('_id') && !json.containsKey('id')) {
+            json['id'] = json['_id'];
+          }
+        }
+        return Ticket.fromJson(json);
+      }).toList();
     } catch (e) {
       throw _handleError(e);
     }
@@ -137,7 +188,16 @@ class TicketService {
         {},
       );
 
-      return Ticket.fromJson(response.data['data']);
+      // Normalize ID field
+      final responseData = response.data['data'];
+      if (responseData is Map<String, dynamic>) {
+        if (responseData.containsKey('_id') &&
+            !responseData.containsKey('id')) {
+          responseData['id'] = responseData['_id'];
+        }
+      }
+
+      return Ticket.fromJson(responseData);
     } catch (e) {
       throw _handleError(e);
     }

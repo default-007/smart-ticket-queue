@@ -63,26 +63,32 @@ class ApiService {
               if (token != null) {
                 print(
                     'Login timeout but token found - considering login successful');
-                // Return a synthetic success response
-                return handler.resolve(Response(
-                  requestOptions: error.requestOptions,
-                  data: {
-                    'success': true,
-                    'token': token,
-                  },
-                  statusCode: 200,
-                ));
+
+                // The problem is here - the synthetic response needs user data too
+                // Get the user data to fully restore the session
+                try {
+                  // Attempt to get user data with the existing token
+                  final userResponse = await _dio.get('/auth/me',
+                      options:
+                          Options(headers: {'Authorization': 'Bearer $token'}));
+
+                  // Return a more complete synthetic response
+                  return handler.resolve(Response(
+                    requestOptions: error.requestOptions,
+                    data: {
+                      'success': true,
+                      'token': token,
+                      'data': userResponse.data['data'], // Include user data
+                    },
+                    statusCode: 200,
+                  ));
+                } catch (userError) {
+                  // If we can't get user data, the token might be invalid
+                  await _storage.delete(key: 'token');
+                  print('Token cleared due to validation failure');
+                }
               }
             }
-
-            return handler.reject(
-              DioException(
-                requestOptions: error.requestOptions,
-                error:
-                    'Connection timeout. Please check your internet connection and try again.',
-                type: error.type,
-              ),
-            );
           }
 
           if (error.response?.statusCode == 401) {

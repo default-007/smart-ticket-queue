@@ -209,3 +209,11 @@
 [31m    at /home/default/Desktop/Projects/smart-ticket-queue/backend/ticket-system-backend/src/controllers/ticketController.js:105:17[39m
 [31m    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
 2025-03-15 14:32:32:3232 [32minfo[39m: [32mHandling ticket created event for 67d56550d0533dac67677091[39m
+2025-03-16 17:44:29:4429 [32minfo[39m: [32mHandling ticket created event for 67d6e3cdea37d5f5d6dc2ac5[39m
+2025-03-16 19:47:22:4722 [32minfo[39m: [32mHandling ticket created event for 67d7009a89b353287d8d5970[39m
+2025-03-16 19:48:12:4812 [32minfo[39m: [32mHandling ticket created event for 67d700cc89b353287d8d6ef6[39m
+2025-03-17 12:16:11:1611 [31merror[39m: [31mError: Agent not found[39m
+[31mError: Agent not found[39m
+[31m    at ShiftService.startShift (/home/default/Desktop/Projects/smart-ticket-queue/backend/ticket-system-backend/src/services/shiftService.js:10:11)[39m
+[31m    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+[31m    at async /home/default/Desktop/Projects/smart-ticket-queue/backend/ticket-system-backend/src/controllers/shiftController.js:7:16[39m

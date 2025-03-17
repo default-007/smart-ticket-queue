@@ -1,189 +1,223 @@
-# Smart Ticketing System
+# Smart Ticketing Flutter Frontend
 
 ## Overview
 
-Smart Ticketing is a comprehensive ticketing management system designed to streamline support and service desk operations. The application provides a robust platform for tracking, managing, and resolving tickets across different departments and roles.
+The frontend component of the Smart Ticketing System is a cross-platform mobile application built with Flutter. It provides intuitive interfaces for tickets, agent management, SLA monitoring, and more.
 
-## Features
+## Key Features
 
-### Backend (Node.js/Express)
+- 🔐 **User Authentication**: Secure login and registration with JWT authentication
+- 📱 **Role-specific Dashboards**: Customized experiences for admins, agents, and users
+- 🎫 **Ticket Management**: Create, view, and manage tickets with comprehensive filters
+- 📊 **Performance Analytics**: Dashboards for monitoring SLA compliance and workload
+- 👥 **Agent Management**: Status tracking and workload visualization
+- 🔄 **Real-time Updates**: Live notifications via WebSockets
+- 📆 **Shift Management**: Schedule and manage agent shifts and breaks
 
-- User Authentication & Authorization
-- Ticket Management
-- Agent Management
-- Service Level Agreement (SLA) Tracking
-- Real-time Notifications
-- WebSocket Integration
-- Automated Ticket Queue Processing
-- Role-based Access Control
+## Project Structure
 
-### Frontend (Flutter)
+```
+lib/
+│
+├── config/                     # Configuration files
+│   ├── api_config.dart         # API endpoint configuration
+│   └── theme.dart              # Application theme
+│
+├── models/                     # Data models
+│   ├── agent.dart              # Agent model
+│   ├── ticket.dart             # Ticket model
+│   ├── notification_item.dart  # Notification model
+│   ├── shift.dart              # Shift model
+│   ├── sla.dart                # SLA model
+│   ├── user.dart               # User model
+│   └── workload.dart           # Workload model
+│
+├── providers/                  # State management
+│   ├── auth_provider.dart      # Authentication state
+│   ├── ticket_provider.dart    # Ticket management state
+│   ├── agent_provider.dart     # Agent management state
+│   ├── notification_provider.dart # Notification state
+│   ├── shift_provider.dart     # Shift management state
+│   ├── sla_provider.dart       # SLA monitoring state
+│   └── workload_provider.dart  # Workload analysis state
+│
+├── screens/                    # UI Screens
+│   ├── auth/                   # Authentication screens
+│   ├── dashboard/              # Dashboard screens
+│   ├── tickets/                # Ticket management screens
+│   ├── agents/                 # Agent management screens
+│   ├── profile/                # User profile screens
+│   ├── shifts/                 # Shift management screens
+│   ├── sla/                    # SLA monitoring screens
+│   └── workload/               # Workload analysis screens
+│
+├── services/                   # API and service layer
+│   ├── api_service.dart        # Base API service
+│   ├── auth_service.dart       # Authentication service
+│   ├── ticket_service.dart     # Ticket service
+│   ├── agent_service.dart      # Agent service
+│   ├── notification_service.dart # Notification service
+│   └── shift_service.dart      # Shift management service
+│
+├── utils/                      # Helper utilities
+│   ├── logger.dart             # Logging utility
+│   └── validators.dart         # Form validation
+│
+└── widgets/                    # Reusable UI components
+    ├── agents/                 # Agent-related widgets
+    ├── tickets/                # Ticket-related widgets
+    ├── common/                 # Shared widgets
+    ├── notifications/          # Notification widgets
+    └── sla/                    # SLA-related widgets
+```
 
-- Responsive Mobile Application
-- State Management with Riverpod
-- Role-based Dashboards (Admin, Agent, User)
-- Ticket Creation and Tracking
-- Real-time Notifications
-- SLA Monitoring
-- Agent Status Management
+## Key Screens
 
-## Technology Stack
+### Authentication
 
-### Backend
+- Login Screen
+- Registration Screen
 
-- Node.js
-- Express.js
-- MongoDB
-- Mongoose
-- Socket.IO
-- JSON Web Token (JWT)
-- WebSocket
+### Dashboards
 
-### Frontend
+- Admin Dashboard: Overview of system performance, recent activity
+- Agent Dashboard: Current workload, assigned tickets, shift status
 
-- Flutter
-- Dart
-- Riverpod (State Management)
-- Dio (HTTP Requests)
-- Socket.IO Client
-- Go Router
+### Ticket Management
 
-## Prerequisites
+- Ticket List: Filterable list of tickets with status indicators
+- Ticket Detail: Comprehensive view of ticket information
+- Create Ticket: Form for creating new support tickets
 
-### Backend
+### Agent Management
 
-- Node.js (v16+)
-- MongoDB (v4.4+)
-- npm or yarn
+- Agent List: Overview of all agents with status indicators
+- Agent Form: Create/edit agent details and skills
 
-### Frontend
+### SLA Monitoring
+
+- SLA Dashboard: Performance metrics and compliance rates
+- SLA Configuration: Customize SLA parameters by priority and category
+
+### Workload Management
+
+- Workload Dashboard: Visualization of agent workloads and team capacities
+- Workload Optimization: Tools for balancing and optimizing assignments
+
+### Shift Management
+
+- Shift Calendar: Schedule view of agent shifts
+- Shift Detail: Current shift status with break management
+- Break Scheduling: Interface for planning agent breaks
+
+## State Management with Riverpod
+
+The application uses Riverpod for state management, which provides:
+
+- Predictable state updates
+- Separation of business logic from UI
+- Efficient rebuilds for optimal performance
+- Testable and maintainable code structure
+
+Examples of providers include:
+
+- `authProvider`: Manages authentication state
+- `ticketProvider`: Handles ticket data and operations
+- `agentProvider`: Manages agent information
+- `slaProvider`: Tracks SLA metrics and configurations
+- `workloadProvider`: Analyzes and optimizes workload distribution
+
+## API Integration
+
+The frontend communicates with the backend through a comprehensive API layer:
+
+- `ApiService`: Base service with interceptors for authentication and error handling
+- Service-specific classes for domain operations (tickets, agents, etc.)
+- WebSocket integration for real-time updates
+
+## Real-time Features
+
+The application includes real-time capabilities through Socket.IO:
+
+- Instant notifications for ticket updates
+- Live status changes for agents
+- Real-time SLA breach alerts
+- Immediate workload rebalancing notifications
+
+## Local Storage
+
+Secure local data persistence for:
+
+- Authentication tokens
+- User preferences
+- Offline operation support
+
+## Charts and Visualizations
+
+The application uses FL Chart for data visualization:
+
+- SLA compliance trends
+- Workload distribution charts
+- Team capacity visualizations
+- Performance metrics graphs
+
+## Setup and Development
+
+### Prerequisites
 
 - Flutter SDK (v3.10+)
 - Dart SDK
 - Android Studio or VS Code
 - Xcode (for iOS development)
 
-## Setup Instructions
+### Installation
 
-### Backend Setup
-
-1. Clone the repository
-
-```bash
-git clone https://github.com/default-007/smart-ticket-queue.git
-cd smart-ticketing/backend
-```
-
-2. Install dependencies
-
-```bash
-npm install
-```
-
-3. Create a `.env` file in the root directory with the following variables:
-
-```
-MONGODB_URI=mongodb://localhost:27017/smart_ticketing
-JWT_SECRET=your_jwt_secret
-PORT=5000
-CLIENT_URL=http://localhost:3000
-```
-
-4. Start the development server
-
-```bash
-npm run dev
-```
-
-### Frontend Setup
-
-1. Navigate to the frontend directory
-
-```bash
-cd ../frontend
-```
-
-2. Get Flutter dependencies
+1. Install Flutter dependencies
 
 ```bash
 flutter pub get
 ```
 
-3. Configure API Endpoint
-
-- Open `lib/config/api_config.dart`
-- Update base URLs for Android, iOS, and other platforms
-
-4. Generate JSON serialization code
+2. Generate JSON serialization code
 
 ```bash
 dart run build_runner build --delete-conflicting-outputs
 ```
 
-5. Run the application
+3. Configure API endpoints in `lib/config/api_config.dart`
+
+4. Run the application
 
 ```bash
-# For Android
-flutter run -d android
-
-# For iOS
-flutter run -d ios
+flutter run
 ```
 
-## Environment Configuration
+### Environment Configuration
 
-### Development
+Configure environment-specific settings for development, staging, and production:
 
-- Use `10.0.2.2` for Android Emulator
-- Use `localhost` for iOS Simulator
-- Use your local IP for physical devices
+- Android: Use `10.0.2.2` for emulator, local IP for physical devices
+- iOS: Use `localhost` for simulator, local IP for physical devices
 
-### Production
+## Performance Optimization
 
-- Configure appropriate base URLs in `api_config.dart`
-- Set up environment-specific `.env` files
+- Lazy loading for list screens
+- Caching strategies for API responses
+- Debounced API calls for search/filter
+- Efficient widget rebuilds with Riverpod selectors
+- Image optimization and caching
 
-## Testing
+## Future Improvements
 
-### Backend Tests
-
-```bash
-npm test
-```
-
-### Frontend Tests
-
-```bash
-flutter test
-```
-
-## Deployment
-
-### Backend Deployment
-
-- Deploy to cloud platforms like Heroku, AWS, or DigitalOcean
-- Ensure MongoDB is configured
-- Set environment variables
-
-### Frontend Deployment
-
-- Generate release builds for Android and iOS
-- Publish to Google Play Store and Apple App Store
-
-## Contributing
-
-1. Fork the repository
-2. Create a new branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- Offline support with local database
+- Biometric authentication
+- Push notifications
+- Dark mode theme
+- Localization and internationalization
+- Advanced filtering and searching
+- More comprehensive analytics dashboards
+- Enhanced visualization components
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
-
-## Contact
-
-Brian Otieno - brianokola@gmail.com
-
-Project Link: [https://github.com/default-007/smart-ticket-queue](https://github.com/yourusername/smart-ticket-queue)
+MIT License

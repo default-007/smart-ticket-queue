@@ -1,10 +1,12 @@
 // lib/providers/ticket_provider.dart
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:smart_ticketing/services/api_service.dart';
+import 'package:smart_ticketing/utils/logger.dart';
 import '../models/ticket.dart';
 import '../services/ticket_service.dart';
+import '../services/api_service.dart';
 
 // Enum for loading states to handle different UI states
 enum TicketLoadingState { initial, loading, loaded, error }
@@ -69,6 +71,7 @@ class TicketState {
 
 class TicketNotifier extends StateNotifier<TicketState> {
   final TicketService _ticketService;
+  final logger = Logger();
 
   TicketNotifier(this._ticketService) : super(const TicketState());
 
@@ -83,7 +86,7 @@ class TicketNotifier extends StateNotifier<TicketState> {
       _lastCacheTime != null &&
       DateTime.now().difference(_lastCacheTime!) < _cacheDuration;
 
-  // Update loadTickets with debouncing and caching
+  // Update loadTickets with improved implementation, debugging, and forceRefresh option
   Future<void> loadTickets({
     String? status,
     String? assignedTo,
@@ -94,6 +97,8 @@ class TicketNotifier extends StateNotifier<TicketState> {
 
     // Check if we can use cached data
     if (!forceRefresh && _isCacheValid && state.isLoaded) {
+      logger
+          .debug('Using cached ticket data from ${_lastCacheTime.toString()}');
       return;
     }
 
@@ -103,6 +108,9 @@ class TicketNotifier extends StateNotifier<TicketState> {
     // Use debounce to prevent excessive calls
     _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
       try {
+        logger
+            .info('Loading tickets - status: $status, assignedTo: $assignedTo');
+
         state = state.copyWith(
           loadingState: TicketLoadingState.loading,
           clearError: true,
@@ -117,13 +125,17 @@ class TicketNotifier extends StateNotifier<TicketState> {
           assignedTo: assignedTo,
         );
 
+        logger.info('Loaded ${tickets.length} tickets successfully');
+
         state = state.copyWith(
           loadingState: TicketLoadingState.loaded,
           tickets: tickets,
+          lastLoaded: DateTime.now(),
         );
 
         _lastCacheTime = DateTime.now();
       } catch (e) {
+        logger.error('Error loading tickets: $e');
         state = state.copyWith(
           loadingState: TicketLoadingState.error,
           errorMessage: e.toString(),
@@ -164,151 +176,100 @@ class TicketNotifier extends StateNotifier<TicketState> {
   // Update ticket status with optimistic updates for better UX
   Future<void> updateTicketStatus(String ticketId, String status) async {
     try {
-      // Find ticket in current state
-      final ticketIndex = state.tickets.indexWhere((t) => t.id == ticketId);
-      if (ticketIndex == -1) {
-        throw Exception('Ticket not found in state');
+      // Find the existing ticket in state
+      final existingTicket = state.tickets.firstWhere(
+        (ticket) => ticket.id == ticketId,
+        orElse: () => throw Exception('Ticket not found'),
+      );
+
+      // Create optimistic update (immediate UI update)
+      final optimisticTickets = [...state.tickets];
+      final index = optimisticTickets.indexWhere((t) => t.id == ticketId);
+
+      if (index != -1) {
+        // Create temporary optimistic ticket with updated status
+        optimisticTickets[index] = existingTicket.copyWith(status: status);
+
+        // Update state immediately for responsive UI
+        state = state.copyWith(tickets: optimisticTickets);
       }
 
-      final ticket = state.tickets[ticketIndex];
-      final oldStatus = ticket.status;
+      // Make the actual API call
+      final updatedTicket =
+          await _ticketService.updateTicketStatus(ticketId, status);
 
-      // Create optimistically updated ticket list
-      final updatedTickets = List<Ticket>.from(state.tickets);
+      // Update the state again with the accurate server data
+      final updatedTickets = [...state.tickets];
+      final finalIndex = updatedTickets.indexWhere((t) => t.id == ticketId);
 
-      // Create updated ticket (this is a simplification, actual implementation
-      // would depend on how your Ticket class handles immutability)
-      final updatedTicket = Ticket(
-        id: ticket.id,
-        title: ticket.title,
-        description: ticket.description,
-        status: status, // Updated status
-        priority: ticket.priority,
-        dueDate: ticket.dueDate,
-        estimatedHours: ticket.estimatedHours,
-        assignedTo: ticket.assignedTo,
-        createdBy: ticket.createdBy,
-        createdAt: ticket.createdAt,
-        updatedAt: DateTime.now(),
-        sla: ticket.sla,
-        department: ticket.department,
-        requiredSkills: ticket.requiredSkills,
-      );
-
-      // Update list with optimistic data
-      updatedTickets[ticketIndex] = updatedTicket;
-
-      // Update state with optimistic changes
-      state = state.copyWith(
-        tickets: updatedTickets,
-        clearError: true,
-      );
-
-      // Call API
-      final resultTicket = await _ticketService.updateTicketStatus(
-        ticketId,
-        status,
-      );
-
-      // Update with actual server response
-      final finalTickets = List<Ticket>.from(state.tickets);
-      finalTickets[ticketIndex] = resultTicket;
-
-      state = state.copyWith(
-        tickets: finalTickets,
-      );
+      if (finalIndex != -1) {
+        updatedTickets[finalIndex] = updatedTicket;
+        state = state.copyWith(tickets: updatedTickets);
+      }
     } catch (e) {
-      // Handle errors - could revert optimistic update here
+      logger.error('Error updating ticket status: $e');
       state = state.copyWith(
         errorMessage: e.toString(),
+        loadingState: TicketLoadingState.error,
       );
-      rethrow;
     }
   }
 
-  Future<Ticket> updateTicketWithAgent(
+  Future<void> updateTicketWithAgent(
       String ticketId, String status, String agentId) async {
     try {
-      state = state.copyWith(
-        loadingState: TicketLoadingState.loading,
-        clearError: true,
-      );
-
-      final response =
+      final updatedTicket =
           await _ticketService.updateTicketWithAgent(ticketId, status, agentId);
 
-      // Update state with new ticket data
-      final updatedTickets = List<Ticket>.from(state.tickets);
+      final updatedTickets = [...state.tickets];
       final index = updatedTickets.indexWhere((t) => t.id == ticketId);
-      if (index >= 0) {
-        updatedTickets[index] = response;
+
+      if (index != -1) {
+        updatedTickets[index] = updatedTicket;
+        state = state.copyWith(tickets: updatedTickets);
       }
-
-      state = state.copyWith(
-        tickets: updatedTickets,
-        loadingState: TicketLoadingState.loaded,
-      );
-
-      return response;
     } catch (e) {
+      logger.error('Error assigning ticket to agent: $e');
       state = state.copyWith(
-        loadingState: TicketLoadingState.error,
         errorMessage: e.toString(),
+        loadingState: TicketLoadingState.error,
       );
-      throw e;
     }
   }
 
-  Future<Ticket> resolveEscalation(String ticketId) async {
+  Future<void> resolveEscalation(String ticketId) async {
     try {
-      state = state.copyWith(
-        loadingState: TicketLoadingState.loading,
-        clearError: true,
-      );
+      final updatedTicket = await _ticketService.resolveEscalation(ticketId);
 
-      // Call the API to resolve the escalation
-      final response = await _ticketService.resolveEscalation(ticketId);
-
-      // Update state with the resolved ticket
-      final updatedTickets = List<Ticket>.from(state.tickets);
+      final updatedTickets = [...state.tickets];
       final index = updatedTickets.indexWhere((t) => t.id == ticketId);
-      if (index >= 0) {
-        updatedTickets[index] = response;
+
+      if (index != -1) {
+        updatedTickets[index] = updatedTicket;
+        state = state.copyWith(tickets: updatedTickets);
       }
-
-      state = state.copyWith(
-        tickets: updatedTickets,
-        loadingState: TicketLoadingState.loaded,
-      );
-
-      return response;
     } catch (e) {
+      logger.error('Error resolving escalation: $e');
       state = state.copyWith(
-        loadingState: TicketLoadingState.error,
         errorMessage: e.toString(),
+        loadingState: TicketLoadingState.error,
       );
-      throw e;
     }
   }
 
   // Process ticket queue
   Future<void> processQueue() async {
     try {
-      state = state.copyWith(
-        loadingState: TicketLoadingState.loading,
-        clearError: true,
-      );
-
       await _ticketService.processQueue();
 
       // Reload tickets to get updated state
       await loadTickets(forceRefresh: true);
     } catch (e) {
+      logger.error('Error processing ticket queue: $e');
       state = state.copyWith(
-        loadingState: TicketLoadingState.error,
         errorMessage: e.toString(),
+        loadingState: TicketLoadingState.error,
       );
-      rethrow;
     }
   }
 

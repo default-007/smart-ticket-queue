@@ -33,3 +33,8 @@
 [31mReferenceError: Agent is not defined[39m
 [31m    at /home/default/Desktop/Projects/smart-ticket-queue/backend/ticket-system-backend/src/controllers/ticketController.js:105:17[39m
 [31m    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+2025-03-17 12:16:11:1611 [31merror[39m: [31mError: Agent not found[39m
+[31mError: Agent not found[39m
+[31m    at ShiftService.startShift (/home/default/Desktop/Projects/smart-ticket-queue/backend/ticket-system-backend/src/services/shiftService.js:10:11)[39m
+[31m    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+[31m    at async /home/default/Desktop/Projects/smart-ticket-queue/backend/ticket-system-backend/src/controllers/shiftController.js:7:16[39m

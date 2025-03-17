@@ -60,33 +60,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       print(
           'Router redirect - Path: $currentPath, Auth Status: ${authState.status}');
 
-      // Don't redirect if we're already at the correct location
-      /* if (currentPath == '/splash' && authState.status == AuthStatus.initial) {
-        return null;
-      } */
-
-      // Handle different auth states
-      /* switch (authState.status) {
-        case AuthStatus.initial:
-          // Only redirect to splash if we're not already there
-          return currentPath != '/splash' ? '/splash' : null;
-
-        case AuthStatus.unauthenticated:
-          // Allow splash screen to show while checking auth
-          if (currentPath == '/splash') return null;
-          // Otherwise redirect to login if not already there
-          return currentPath == '/login' ? null : '/login';
-
-        case AuthStatus.authenticated:
-          // Redirect to appropriate dashboard based on role
-          if (currentPath == '/splash' || currentPath == '/login') {
-            return _getInitialRoute(authState.user?.role);
-          }
-          return null;
-
-        default:
-          return null;
-      } */
       // Always allow access to splash screen during initial state
       if (authState.status == AuthStatus.initial && currentPath == '/splash') {
         return null;
@@ -218,11 +191,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/shifts',
-        builder: (context, state) => const ProtectedRoute(
-          allowedRoles: ['admin', 'agent'],
-          child: ShiftManagementScreen(
-              agentId: ''), // You'll need to pass the actual agentId
-        ),
+        builder: (context, state) => const ShiftManagementScreen(),
       ),
     ],
     errorBuilder: (context, state) => ErrorScreen(

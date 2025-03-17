@@ -23,6 +23,22 @@ class AgentService {
       }
 
       final List<dynamic> agentsJson = response.data['data'];
+      final agents = [];
+      for (var json in agentsJson) {
+        try {
+          // Add the missing user field if needed
+          json['user'] = json['user'] ?? null;
+          // Convert _id to id if needed
+          json['id'] = json['_id'];
+          print('Parsing agent: ${json['name']}');
+          final agent = Agent.fromJson(json);
+          agents.add(agent);
+        } catch (e) {
+          print('Error parsing specific agent: $e');
+          print('Problem JSON: $json');
+        }
+      }
+
       return agentsJson.map((json) => Agent.fromJson(json)).toList();
     } catch (e) {
       print('Error in getAgents: $e'); // Debug print

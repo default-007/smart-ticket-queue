@@ -1,6 +1,8 @@
+// admin_dashboard.dart (improved implementation)
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import 'package:smart_ticketing/models/agent.dart';
 import 'package:smart_ticketing/models/sla.dart';
 import 'package:smart_ticketing/models/ticket.dart';
@@ -15,49 +17,6 @@ import 'package:smart_ticketing/widgets/common/custom_drawer.dart';
 import 'package:smart_ticketing/widgets/common/error_display.dart';
 import 'package:smart_ticketing/widgets/common/loading_indicator.dart';
 import 'package:smart_ticketing/widgets/tickets/ticket_card.dart';
-
-// Create a dashboard metrics provider to consolidate data
-final dashboardMetricsProvider = FutureProvider<DashboardMetrics>((ref) async {
-  // Get data from all relevant providers
-  final ticketState = await ref.watch(ticketProvider);
-  final workloadState = await ref.watch(workloadProvider);
-  final agentState = await ref.watch(agentProvider);
-  final slaState = await ref.watch(slaProvider);
-
-  // Parse metrics for the dashboard
-  return DashboardMetrics(
-    totalTickets: ticketState.tickets.length,
-    openTickets: ticketState.tickets
-        .where((t) => t.status != 'closed' && t.status != 'resolved')
-        .length,
-    slaBreaches:
-        ticketState.tickets.where((t) => t.sla?.isBreached ?? false).length,
-    totalAgents: agentState.agents.length,
-    onlineAgents: agentState.agents.where((a) => a.status == 'online').length,
-    averageWorkload: workloadState.metrics?.averageLoad ?? 0,
-    slaCompliance: slaState.metrics?.slaComplianceRate ?? 0,
-  );
-});
-
-class DashboardMetrics {
-  final int totalTickets;
-  final int openTickets;
-  final int slaBreaches;
-  final int totalAgents;
-  final int onlineAgents;
-  final double averageWorkload;
-  final double slaCompliance;
-
-  DashboardMetrics({
-    required this.totalTickets,
-    required this.openTickets,
-    required this.slaBreaches,
-    required this.totalAgents,
-    required this.onlineAgents,
-    required this.averageWorkload,
-    required this.slaCompliance,
-  });
-}
 
 class AdminDashboard extends ConsumerStatefulWidget {
   const AdminDashboard({Key? key}) : super(key: key);
@@ -97,17 +56,19 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
     });
 
     try {
-      // Load data from providers
-      await ref.read(ticketProvider.notifier).loadTickets();
-      await ref.read(agentProvider.notifier).loadAvailableAgents();
+      // Ensure we force refresh data by passing forceRefresh: true
+      await ref.read(ticketProvider.notifier).loadTickets(forceRefresh: true);
+      await ref.read(agentProvider.notifier).loadAgents();
       await ref.read(workloadProvider.notifier).refreshWorkloadData();
       await ref.read(slaProvider.notifier).loadSLAMetrics();
       await ref.read(notificationProvider.notifier).loadNotifications();
     } catch (e) {
       // Handle errors
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error refreshing data: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error refreshing data: $e')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -129,9 +90,24 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
 
   @override
   Widget build(BuildContext context) {
+    // Access providers directly
     final ticketState = ref.watch(ticketProvider);
     final agentState = ref.watch(agentProvider);
-    final metricsAsync = ref.watch(dashboardMetricsProvider);
+    final workloadState = ref.watch(workloadProvider);
+    final slaState = ref.watch(slaProvider);
+
+    // Manual calculation of dashboard metrics if needed
+    final totalTickets = ticketState.tickets.length;
+    final openTickets = ticketState.tickets
+        .where((t) => t.status != 'closed' && t.status != 'resolved')
+        .length;
+    final slaBreaches =
+        ticketState.tickets.where((t) => t.isSLABreached).length;
+    final totalAgents = agentState.agents.length;
+    final onlineAgents =
+        agentState.agents.where((a) => a.status == 'online').length;
+    final averageWorkload = workloadState.metrics?.averageLoad ?? 0;
+    final slaCompliance = slaState.metrics?.slaComplianceRate ?? 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -167,9 +143,22 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildOverviewTab(metricsAsync),
+          // Overview Tab
+          _buildOverviewTab(
+            totalTickets: totalTickets,
+            openTickets: openTickets,
+            slaBreaches: slaBreaches,
+            totalAgents: totalAgents,
+            onlineAgents: onlineAgents,
+            averageWorkload: averageWorkload,
+            slaCompliance: slaCompliance,
+            ticketState: ticketState,
+          ),
+          // Queue Tab
           _buildQueueTab(ticketState),
+          // Active Tickets Tab
           _buildActiveTicketsTab(ticketState),
+          // Agents Tab
           _buildAgentsTab(agentState),
         ],
       ),
@@ -186,18 +175,16 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
     );
   }
 
-  Widget _buildOverviewTab(AsyncValue<DashboardMetrics> metricsAsync) {
-    return metricsAsync.when(
-      data: (metrics) => _buildOverviewContent(metrics),
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => ErrorDisplay(
-        message: err.toString(),
-        onRetry: _loadAllData,
-      ),
-    );
-  }
-
-  Widget _buildOverviewContent(DashboardMetrics metrics) {
+  Widget _buildOverviewTab({
+    required int totalTickets,
+    required int openTickets,
+    required int slaBreaches,
+    required int totalAgents,
+    required int onlineAgents,
+    required double averageWorkload,
+    required double slaCompliance,
+    required TicketState ticketState,
+  }) {
     return RefreshIndicator(
       onRefresh: _loadAllData,
       child: SingleChildScrollView(
@@ -217,19 +204,19 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
               children: [
                 _buildMetricCard(
                   'Total Tickets',
-                  '${metrics.totalTickets}',
+                  '$totalTickets',
                   Icons.confirmation_number,
                   Colors.blue,
                 ),
                 _buildMetricCard(
                   'Open Tickets',
-                  '${metrics.openTickets}',
+                  '$openTickets',
                   Icons.inbox,
                   Colors.orange,
                 ),
                 _buildMetricCard(
                   'SLA Breaches',
-                  '${metrics.slaBreaches}',
+                  '$slaBreaches',
                   Icons.warning,
                   Colors.red,
                 ),
@@ -243,19 +230,19 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
               children: [
                 _buildMetricCard(
                   'Total Agents',
-                  '${metrics.totalAgents}',
+                  '$totalAgents',
                   Icons.people,
                   Colors.purple,
                 ),
                 _buildMetricCard(
                   'Online Agents',
-                  '${metrics.onlineAgents}',
+                  '$onlineAgents',
                   Icons.person,
                   Colors.green,
                 ),
                 _buildMetricCard(
                   'Avg Workload',
-                  '${metrics.averageWorkload.toStringAsFixed(1)}h',
+                  '${averageWorkload.toStringAsFixed(1)}h',
                   Icons.work,
                   Colors.amber,
                 ),
@@ -280,20 +267,20 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
                     ),
                     const SizedBox(height: 16),
                     LinearProgressIndicator(
-                      value: metrics.slaCompliance / 100,
+                      value: slaCompliance / 100,
                       minHeight: 10,
                       backgroundColor: Colors.grey[300],
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        _getSLAColor(metrics.slaCompliance),
+                        _getSLAColor(slaCompliance),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text(
-                        '${metrics.slaCompliance.toStringAsFixed(1)}%',
+                        '${slaCompliance.toStringAsFixed(1)}%',
                         style: TextStyle(
-                          color: _getSLAColor(metrics.slaCompliance),
+                          color: _getSLAColor(slaCompliance),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -306,7 +293,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
             const SizedBox(height: 24),
 
             // Recent Activity
-            _buildRecentActivitySection(),
+            _buildRecentActivitySection(ticketState.tickets),
           ],
         ),
       ),
@@ -357,14 +344,9 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
     );
   }
 
-  Widget _buildRecentActivitySection() {
-    final ticketState = ref.watch(ticketProvider);
-    final notificationState = ref.watch(notificationProvider);
-
+  Widget _buildRecentActivitySection(List<Ticket> tickets) {
     // Get recent tickets (last 5)
-    final recentTickets = ticketState.tickets
-        .where((t) => t.status != 'closed')
-        .toList()
+    final recentTickets = tickets.where((t) => t.status != 'closed').toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
     final recentActivity = recentTickets.take(5).toList();
@@ -407,12 +389,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
                           backgroundColor: Colors.grey,
                         ),
                   onTap: () {
-                    // Navigate to ticket details
-                    Navigator.pushNamed(
-                      context,
-                      '/tickets/detail',
-                      arguments: ticket,
-                    );
+                    // Navigate to ticket details using Go Router
+                    context.push('/tickets/detail', extra: ticket);
                   },
                 )),
           ],
@@ -473,7 +451,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
         padding: const EdgeInsets.all(16),
         itemCount: queuedTickets.length,
         itemBuilder: (context, index) {
-          return TicketCard(ticket: queuedTickets[index]);
+          return TicketCard(
+            ticket: queuedTickets[index],
+            onTap: () {
+              context.push('/tickets/detail', extra: queuedTickets[index]);
+            },
+          );
         },
       ),
     );
@@ -498,7 +481,12 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
         padding: const EdgeInsets.all(16),
         itemCount: activeTickets.length,
         itemBuilder: (context, index) {
-          return TicketCard(ticket: activeTickets[index]);
+          return TicketCard(
+            ticket: activeTickets[index],
+            onTap: () {
+              context.push('/tickets/detail', extra: activeTickets[index]);
+            },
+          );
         },
       ),
     );
@@ -512,7 +500,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
     if (agentState.error != null) {
       return ErrorDisplay(
         message: agentState.error!,
-        onRetry: () => ref.read(agentProvider.notifier).loadAvailableAgents(),
+        onRetry: () => ref.read(agentProvider.notifier).loadAgents(),
       );
     }
 
@@ -531,11 +519,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
             agent: agent,
             onTap: () {
               // Navigate to agent details
-              Navigator.pushNamed(
-                context,
-                '/agents/detail',
-                arguments: agent,
-              );
+              context.push('/agents/edit/${agent.id}', extra: agent);
             },
           );
         },

@@ -67,6 +67,7 @@ app.use("/api/agents", require("./src/routes/agentRoutes"));
 app.use("/api/notifications", require("./src/routes/notificationRoutes"));
 app.use("/api/sla", require("./src/routes/slaRoutes"));
 app.use("/api/workload", require("./src/routes/workloadRoutes"));
+app.use("/api/shifts", require("./src/routes/shiftRoutes"));
 
 // Base route for testing
 app.get("/", (req, res) => {
